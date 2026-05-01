@@ -1,0 +1,106 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand-purple: #5B2D8E;
+    --brand-orange: #F5921E;
+    --brand-blue: #0099DB;
+    --brand-pink: #E91E63;
+    --brand-gold: #FFB300;
+  }
+
+  body {
+    @apply font-body text-gray-900 bg-gray-50 antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-brand-orange text-white font-semibold py-3 px-6 rounded-2xl hover:bg-brand-orange/90 transition-all duration-200 active:scale-[0.97] shadow-lg shadow-brand-orange/25;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-brand-purple font-semibold py-3 px-6 rounded-2xl border-2 border-brand-purple/20 hover:border-brand-purple/40 transition-all duration-200 active:scale-[0.97];
+  }
+
+  .btn-gradient {
+    @apply bg-gradient-brand text-white font-semibold py-3 px-6 rounded-2xl hover:opacity-90 transition-all duration-200 active:scale-[0.97] shadow-lg;
+  }
+
+  .card {
+    @apply bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-0.5;
+  }
+
+  .card-elevated {
+    @apply bg-white rounded-3xl shadow-xl shadow-black/5 overflow-hidden;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3.5 rounded-2xl border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-blue/30 focus:border-brand-blue transition-all duration-200 font-body;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
+  }
+
+  .badge-orange {
+    @apply badge bg-brand-orange/10 text-brand-orange;
+  }
+
+  .badge-purple {
+    @apply badge bg-brand-purple/10 text-brand-purple;
+  }
+
+  .badge-blue {
+    @apply badge bg-brand-blue/10 text-brand-blue;
+  }
+
+  .badge-pink {
+    @apply badge bg-brand-pink/10 text-brand-pink;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-brand bg-clip-text text-transparent;
+  }
+
+  .glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white/20;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Custom scrollbar for desktop */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
