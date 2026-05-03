@@ -88,6 +88,18 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Accessible focus-visible style for all interactive elements */
+  .focus-visible-ring {
+    @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-purple;
+  }
+}
+
+/* Global focus-visible for keyboard navigation */
+:focus-visible {
+  outline: 2px solid #5B2D8E;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* Custom scrollbar for desktop */

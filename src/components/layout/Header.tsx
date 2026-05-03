@@ -20,9 +20,9 @@ export default function Header() {
   }, [granted, requestLocation]);
 
   return (
-    <header className="sticky top-0 z-40 glass border-b border-gray-200/50">
+    <header role="banner" className="sticky top-0 z-40 glass border-b border-gray-200/50">
       <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
-        <Link href="/" className="flex items-center">
+        <Link href="/" aria-label="COMPREOUVENDA.COM - Página inicial" className="flex items-center">
           <Image
             src="/logo-full.png"
             alt="compreOUvenda.com"
@@ -47,7 +47,7 @@ export default function Header() {
               {granted ? locationLabel : 'Sua localização'}
             </span>
           </button>
-          <Link href="/notifications" className="relative p-2 hover:bg-gray-100 rounded-xl transition-colors">
+          <Link href="/notifications" aria-label="Ver notificações" className="relative p-2 hover:bg-gray-100 rounded-xl transition-colors">
             <Bell className="w-5 h-5 text-gray-600" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-brand-pink rounded-full" />
           </Link>

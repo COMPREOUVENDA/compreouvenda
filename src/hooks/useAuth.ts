@@ -69,13 +69,33 @@ export function useAuth() {
     return data;
   };
 
-  const signUp = async (email: string, password: string, name: string, type: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    name: string,
+    type: string,
+    extras?: {
+      phone?: string;
+      document?: string;
+      city?: string;
+      state?: string;
+      lat?: number;
+      lng?: number;
+    }
+  ) => {
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { name, type },
+        data: {
+          name,
+          type,
+          phone: extras?.phone ?? '',
+          document: extras?.document ?? '',
+          city: extras?.city ?? '',
+          state: extras?.state ?? '',
+        },
       },
     });
 
@@ -85,6 +105,24 @@ export function useAuth() {
     }
 
     // Profile is auto-created by the trigger handle_new_user()
+    // Also update extra fields in case the trigger doesn't copy them
+    if (data.user && extras) {
+      const updatePayload: Record<string, string | number> = {};
+      if (extras.phone) updatePayload.phone = extras.phone;
+      if (extras.document) updatePayload.document = extras.document;
+      if (extras.city) updatePayload.city = extras.city;
+      if (extras.state) updatePayload.state = extras.state;
+      if (extras.lat != null) updatePayload.location_lat = extras.lat;
+      if (extras.lng != null) updatePayload.location_lng = extras.lng;
+
+      if (Object.keys(updatePayload).length > 0) {
+        await supabase
+          .from('users')
+          .update(updatePayload)
+          .eq('auth_id', data.user.id);
+      }
+    }
+
     if (data.user) {
       await loadProfile(data.user.id);
     }

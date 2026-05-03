@@ -1,12 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { Search, SlidersHorizontal, Sparkles } from 'lucide-react';
 import ProductCard from '@/components/product/ProductCard';
-import AdBannerCarousel from '@/components/ads/AdBannerCarousel';
+import { ProductCardSkeleton } from '@/components/product/ProductCardSkeleton';
 import { CATEGORIES } from '@/lib/constants';
 import { useProducts } from '@/hooks/useProducts';
 import type { Product } from '@/types';
+
+// Dynamic import for heavy ad carousel
+const AdBannerCarousel = dynamic(() => import('@/components/ads/AdBannerCarousel'), {
+  ssr: false,
+  loading: () => <div className="h-32 bg-gray-100 animate-pulse rounded-2xl mx-4" aria-hidden="true" />,
+});
 
 const AD_POSITIONS = { firstBreak: 3, interval: 5 }; // After 3 products, then every 5
 
@@ -17,12 +24,13 @@ export default function HomePage() {
   const { products, loading, fetchProducts, searchProducts } = useProducts();
 
   // Filter by category on client side (products already loaded)
-  const filtered = selectedCategory
-    ? products.filter((p) => p.category_id === selectedCategory)
-    : products;
+  const filtered = useMemo(
+    () => selectedCategory ? products.filter((p) => p.category_id === selectedCategory) : products,
+    [products, selectedCategory]
+  );
 
   // Build feed items with ads interspersed
-  const buildFeedWithAds = () => {
+  const feedItems = useMemo(() => {
     const items: { type: 'product' | 'ad'; data?: Product; variant?: 'full' | 'compact' | 'mini'; key: string }[] = [];
     let adCount = 0;
 
@@ -31,19 +39,15 @@ export default function HomePage() {
 
       const position = i + 1;
       if (position === AD_POSITIONS.firstBreak) {
-        // First ad: full variant (hero)
         items.push({ type: 'ad', variant: 'full', key: `ad-${adCount++}` });
       } else if (position > AD_POSITIONS.firstBreak && (position - AD_POSITIONS.firstBreak) % AD_POSITIONS.interval === 0) {
-        // Subsequent ads: alternate compact and mini
         const variant = adCount % 2 === 0 ? 'compact' : 'mini';
         items.push({ type: 'ad', variant, key: `ad-${adCount++}` });
       }
     });
 
     return items;
-  };
-
-  const feedItems = buildFeedWithAds();
+  }, [filtered]);
 
   const handleAdImpression = (adId: string) => {
     // TODO: Send to analytics/Supabase
@@ -163,7 +167,13 @@ export default function HomePage() {
       </div>
 
       {/* Products with interleaved ads */}
-      {viewMode === 'feed' ? (
+      {loading ? (
+        <div className="space-y-4 px-4 pb-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <ProductCardSkeleton key={i} style={viewMode === 'feed' ? 'feed' : 'card'} />
+          ))}
+        </div>
+      ) : viewMode === 'feed' ? (
         <div className="space-y-4 pb-4">
           {feedItems.map((item, i) => (
             item.type === 'product' ? (
@@ -214,7 +224,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {filtered.length === 0 && (
+      {!loading && filtered.length === 0 && (
         <div className="text-center py-20 px-4">
           <p className="text-gray-400 text-lg font-display">Nenhum produto encontrado</p>
           <p className="text-gray-300 text-sm mt-1">Tente outra categoria ou busca</p>

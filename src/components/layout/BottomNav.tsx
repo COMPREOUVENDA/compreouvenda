@@ -17,7 +17,11 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 glass border-t border-gray-200/50 px-2 pb-safe md:hidden">
+    <nav
+      role="navigation"
+      aria-label="Navegação principal"
+      className="fixed bottom-0 left-0 right-0 z-50 glass border-t border-gray-200/50 px-2 pb-safe md:hidden"
+    >
       <div className="flex items-center justify-around py-2">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
@@ -27,6 +31,8 @@ export default function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex flex-col items-center gap-0.5 py-1 px-3 rounded-2xl transition-all duration-200',
                 isActive && !isSell && 'text-brand-purple',
