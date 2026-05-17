@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, Save, Loader2, Check, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Settings, Save, Loader2, Check, Lock, Eye, EyeOff, AlertCircle, MapPin, ToggleLeft, ToggleRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 const DEFAULT_SETTINGS = [
@@ -16,6 +16,9 @@ const DEFAULT_SETTINGS = [
   { key: 'pix_discount', label: 'Desconto PIX (%)', value: '5', type: 'number' },
 ];
 
+// ─── Chave do localStorage para o toggle de geolocalização ────────────────────
+const GEO_REQUIRED_KEY = 'geo_required';
+
 export default function AdminSettingsPage() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -28,6 +31,22 @@ export default function AdminSettingsPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordMsg, setPasswordMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // ── Toggle: Geolocalização Obrigatória ────────────────────────────────────
+  // Lê o estado atual do localStorage; default: false (geo desabilitada para testes)
+  const [geoRequired, setGeoRequired] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const stored = localStorage.getItem(GEO_REQUIRED_KEY);
+      // Se não definido, usa o valor da env var como referência
+      if (stored === null) {
+        return process.env.NEXT_PUBLIC_GEO_REQUIRED === 'true';
+      }
+      return stored === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     const defaults: Record<string, string> = {};
@@ -110,6 +129,26 @@ export default function AdminSettingsPage() {
     }
   };
 
+  // ── Handler do toggle de geolocalização ──────────────────────────────────
+  const handleGeoToggle = () => {
+    const next = !geoRequired;
+    setGeoRequired(next);
+    try {
+      // Persiste no localStorage
+      localStorage.setItem(GEO_REQUIRED_KEY, String(next));
+      // Garante que geo_test_mode seja consistente
+      if (!next) {
+        // Geo desabilitada → ativar modo de teste
+        localStorage.setItem('geo_test_mode', 'true');
+      } else {
+        // Geo habilitada → remover modo de teste
+        localStorage.removeItem('geo_test_mode');
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -125,6 +164,50 @@ export default function AdminSettingsPage() {
           <Check className="w-4 h-4" /> Configurações salvas com sucesso!
         </div>
       )}
+
+      {/* ── Geolocalização Toggle ─────────────────────────────────────────── */}
+      <div className="bg-gray-800 rounded-2xl border border-gray-700 p-6">
+        <h3 className="font-display font-semibold text-white mb-4 flex items-center gap-2">
+          <MapPin className="w-5 h-5 text-gray-400" /> Geolocalização
+        </h3>
+
+        <div className="flex items-center justify-between gap-4 p-4 bg-gray-700/50 rounded-xl">
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-white">Geolocalização Obrigatória</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {geoRequired
+                ? 'Ativo — usuários precisam permitir GPS para acessar o app.'
+                : 'Desativo (Modo Teste) — GeoGate ignorado. Localização mock: São Paulo, SP.'}
+            </p>
+          </div>
+          <button
+            onClick={handleGeoToggle}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-all ${
+              geoRequired
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
+                : 'bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30'
+            }`}
+            title={geoRequired ? 'Clique para desativar a geolocalização obrigatória' : 'Clique para ativar a geolocalização obrigatória'}
+          >
+            {geoRequired ? (
+              <>
+                <ToggleRight className="w-5 h-5" />
+                Ativo
+              </>
+            ) : (
+              <>
+                <ToggleLeft className="w-5 h-5" />
+                Desativo
+              </>
+            )}
+          </button>
+        </div>
+
+        <p className="text-xs text-gray-500 mt-3">
+          Alteração imediata — sem necessidade de recarregar. Para tornar permanente, defina{' '}
+          <code className="text-amber-400">NEXT_PUBLIC_GEO_REQUIRED=true</code> no arquivo <code className="text-amber-400">.env</code>.
+        </p>
+      </div>
 
       {/* Password Change Section */}
       <div className="bg-gray-800 rounded-2xl border border-gray-700 p-6">

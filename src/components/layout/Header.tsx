@@ -3,11 +3,13 @@
 import { useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Bell, MapPin, Loader2 } from 'lucide-react';
+import { Bell, MapPin, Loader2, WifiOff } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 
 export default function Header() {
   const { locationLabel, loading, granted, requestLocation } = useGeolocation();
+  const { isOffline } = useOnlineStatus();
 
   // Auto-request location on first visit
   useEffect(() => {
@@ -21,6 +23,14 @@ export default function Header() {
 
   return (
     <header role="banner" className="sticky top-0 z-40 glass border-b border-gray-200/50">
+      {/* ── Badge Modo Offline ─────────────────────────────────────────────── */}
+      {isOffline && (
+        <div className="w-full bg-amber-500 text-white text-xs font-semibold py-1 px-4 flex items-center justify-center gap-1.5">
+          <WifiOff className="w-3.5 h-3.5 shrink-0" />
+          <span>Modo Offline — exibindo dados do cache</span>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
         <Link href="/" aria-label="COMPREOUVENDA.COM - Página inicial" className="flex items-center">
           <Image

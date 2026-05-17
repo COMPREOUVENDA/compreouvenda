@@ -39,3 +39,4 @@ Thumbs.db
 .cache/
 env_*.txt
 
+.vercel

@@ -3,7 +3,7 @@
 import { memo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart, MapPin, Play, Zap, Users, HandHeart, Gavel } from 'lucide-react';
+import { Heart, MapPin, Play, Zap, Users, HandHeart, Gavel, Package } from 'lucide-react';
 import type { Product } from '@/types';
 import { formatPrice, formatDistance, formatRelativeTime, conditionLabels } from '@/lib/utils';
 
@@ -12,18 +12,41 @@ interface ProductCardProps {
   style?: 'card' | 'feed';
 }
 
+const PLACEHOLDER_GRADIENTS = [
+  'from-purple-400 to-indigo-600',
+  'from-pink-400 to-rose-600',
+  'from-amber-400 to-orange-600',
+  'from-teal-400 to-cyan-600',
+  'from-green-400 to-emerald-600',
+  'from-blue-400 to-sky-600',
+];
+
+function getPlaceholderGradient(id: string): string {
+  const idx = id.charCodeAt(0) % PLACEHOLDER_GRADIENTS.length;
+  return PLACEHOLDER_GRADIENTS[idx];
+}
+
 function ProductCard({ product, style = 'card' }: ProductCardProps) {
   const mainImage = product.images?.[0]?.url || product.video_thumbnail || '';
+  const hasImage = Boolean(mainImage);
 
   if (style === 'feed') {
     return (
       <Link href={`/product/${product.id}`} className="block">
         <div className="relative aspect-[3/4] rounded-3xl overflow-hidden group">
-          {/* Image */}
-          <div
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-            style={{ backgroundImage: `url(${mainImage})` }}
-          />
+          {/* Image or placeholder */}
+          {hasImage ? (
+            <div
+              className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
+              style={{ backgroundImage: `url(${mainImage})` }}
+            />
+          ) : (
+            <div
+              className={`absolute inset-0 bg-gradient-to-br ${getPlaceholderGradient(product.id)} flex items-center justify-center transition-transform duration-700 group-hover:scale-105`}
+            >
+              <Package className="w-16 h-16 text-white/30" aria-hidden="true" />
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
           {/* Video indicator */}
@@ -127,10 +150,18 @@ function ProductCard({ product, style = 'card' }: ProductCardProps) {
     <Link href={`/product/${product.id}`} className="block">
       <div className="card group">
         <div className="relative aspect-square overflow-hidden">
-          <div
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-            style={{ backgroundImage: `url(${mainImage})` }}
-          />
+          {hasImage ? (
+            <div
+              className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+              style={{ backgroundImage: `url(${mainImage})` }}
+            />
+          ) : (
+            <div
+              className={`absolute inset-0 bg-gradient-to-br ${getPlaceholderGradient(product.id)} flex items-center justify-center transition-transform duration-500 group-hover:scale-105`}
+            >
+              <Package className="w-10 h-10 text-white/30" aria-hidden="true" />
+            </div>
+          )}
           {product.video_status === 'ready' && (
             <div className="absolute top-3 left-3 bg-black/40 backdrop-blur-sm rounded-full p-1.5">
               <Play className="w-3 h-3 text-white fill-white" aria-hidden="true" />

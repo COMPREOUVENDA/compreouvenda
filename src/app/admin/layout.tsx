@@ -7,7 +7,8 @@ import Image from 'next/image';
 import {
   LayoutDashboard, Users, Package, Video, CreditCard, GitBranch, Users2,
   HandHeart, Heart, MapPin, Gavel, Zap, Flag, LifeBuoy, Bell, FileText,
-  Settings, Shield, ScrollText, Menu, X, LogOut, ChevronDown, TrendingUp
+  Settings, Shield, ScrollText, Menu, X, LogOut, ChevronDown, TrendingUp,
+  ShieldCheck, Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -21,6 +22,8 @@ const MENU_ITEMS = [
   { id: 'orders', label: 'Pedidos', icon: CreditCard, href: '/admin/orders' },
   { id: 'categories', label: 'Categorias', icon: FileText, href: '/admin/categories' },
   { id: 'videos', label: 'Vídeos & IA', icon: Video, href: '/admin/videos' },
+  { id: 'ai-pricing', label: 'IA Preços', icon: Sparkles, href: '/admin/ai-pricing' },
+  { id: 'escrow', label: 'Escrow', icon: ShieldCheck, href: '/admin/escrow' },
   { id: 'payments', label: 'Pagamentos', icon: CreditCard, href: '/admin/payments' },
   { id: 'splits', label: 'Split', icon: GitBranch, href: '/admin/splits' },
   { id: 'commissions', label: 'Comissões', icon: Users2, href: '/admin/commissions' },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -10,6 +10,11 @@ import {
 } from 'lucide-react';
 import { CATEGORIES, PHOTO_LABELS } from '@/lib/constants';
 import { useProducts } from '@/hooks/useProducts';
+import type { PriceSuggestion } from '@/lib/ai-pricing';
+import { getMarketPosition } from '@/lib/ai-pricing';
+import PriceSuggestionCard from '@/components/ai/PriceSuggestionCard';
+import MarketInsights from '@/components/ai/MarketInsights';
+import PriceCompetitivenessBar from '@/components/ai/PriceCompetitivenessBar';
 
 // Steps: 0 = Fotos, 1 = Informações, 2 = Detalhes, 3 = Publicar
 const STEPS = ['Fotos', 'Info', 'Detalhes', 'Publicar'];
@@ -86,6 +91,22 @@ export default function NewProductPage() {
   const [auctionStartPrice, setAuctionStartPrice] = useState('');
   const [auctionEnd, setAuctionEnd] = useState('');
 
+  // AI Pricing state
+  const [priceSuggestion, setPriceSuggestion] = useState<PriceSuggestion | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [marketData, setMarketData] = useState<{
+    avg_price: number;
+    min_price: number;
+    max_price: number;
+    listings: number;
+    sold_30d: number;
+    avg_days_to_sell: number;
+    demand_level: import('@/lib/ai-pricing').DemandLevel;
+    trend: 'alta' | 'estável' | 'baixa';
+  } | null>(null);
+  const aiDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const marketDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   const { createProduct } = useProducts();
   const router = useRouter();
 
@@ -93,6 +114,42 @@ export default function NewProductPage() {
     setToast(msg);
     setTimeout(() => setToast(null), 3500);
   };
+
+  // Fetch market data when category changes
+  useEffect(() => {
+    if (!categoryId) { setMarketData(null); return; }
+    if (marketDebounceRef.current) clearTimeout(marketDebounceRef.current);
+    marketDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/ai/pricing/market?category=${categoryId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setMarketData(data);
+        }
+      } catch { /* ignore */ }
+    }, 400);
+  }, [categoryId]);
+
+  // Trigger AI pricing analysis when title + category are filled
+  useEffect(() => {
+    if (!title.trim() || !categoryId) { setPriceSuggestion(null); return; }
+    if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current);
+    aiDebounceRef.current = setTimeout(async () => {
+      setAiLoading(true);
+      try {
+        const res = await fetch('/api/ai/pricing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, description, category: categoryId, condition }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success) setPriceSuggestion(json.data);
+        }
+      } catch { /* ignore */ }
+      finally { setAiLoading(false); }
+    }, 1200);
+  }, [title, categoryId, condition]);
 
   const handlePhotoSelect = (index: number) => {
     const input = document.createElement('input');
@@ -226,6 +283,13 @@ export default function NewProductPage() {
       {value ? <ToggleRight className="w-8 h-8 text-brand-purple" /> : <ToggleLeft className="w-8 h-8 text-gray-300" />}
     </button>
   );
+
+  // Competitiveness for entered price
+  const currentPriceNum = parseFloat(price) || 0;
+  const hasCompetitivenessData = currentPriceNum > 0 && marketData && priceSuggestion;
+  const pricePosition = hasCompetitivenessData
+    ? getMarketPosition(currentPriceNum, marketData.avg_price)
+    : null;
 
   if (success) {
     return (
@@ -406,17 +470,43 @@ export default function NewProductPage() {
                     onChange={(e) => setPrice(e.target.value)}
                     className="input-field pr-14"
                   />
-                  <button
-                    onClick={() => showToast('Em breve: sugestão de preço por IA')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-brand-orange/10 hover:bg-brand-orange/20 text-brand-orange text-[10px] font-bold px-2 py-1.5 rounded-xl transition-colors"
-                    aria-label="Sugerir preço com IA"
-                  >
-                    <Tag className="w-3 h-3" />
-                    IA
-                  </button>
+                  {aiLoading ? (
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2">
+                      <Loader2 className="w-4 h-4 text-brand-orange animate-spin" />
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (priceSuggestion) {
+                          setPrice(priceSuggestion.suggested_price.toString());
+                          showToast(`Preço sugerido: R$ ${priceSuggestion.suggested_price}`);
+                        } else if (!title || !categoryId) {
+                          showToast('Preencha título e categoria primeiro');
+                        } else {
+                          showToast('Aguarde a análise de IA...');
+                        }
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-brand-orange/10 hover:bg-brand-orange/20 text-brand-orange text-[10px] font-bold px-2 py-1.5 rounded-xl transition-colors"
+                      aria-label="Sugerir preço com IA"
+                    >
+                      <Tag className="w-3 h-3" />
+                      IA
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
+
+            {/* Price competitiveness bar when user typed a price */}
+            {hasCompetitivenessData && pricePosition && (
+              <PriceCompetitivenessBar
+                currentPrice={currentPriceNum}
+                minMarket={marketData.min_price}
+                avgMarket={marketData.avg_price}
+                maxMarket={marketData.max_price}
+                position={pricePosition}
+              />
+            )}
 
             {/* Description + AI */}
             <div>
@@ -442,35 +532,56 @@ export default function NewProductPage() {
             </div>
           </div>
 
-          {/* AI Assistant Card */}
-          <div className="rounded-2xl border border-brand-purple/20 bg-brand-purple/5 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-purple to-brand-blue flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
+          {/* AI Pricing suggestion card */}
+          {(aiLoading || priceSuggestion) && (
+            <PriceSuggestionCard
+              suggestion={priceSuggestion}
+              loading={aiLoading}
+              onUsePrice={(p) => {
+                setPrice(p.toString());
+                showToast(`Preço aplicado: R$ ${p.toFixed(2)}`);
+              }}
+            />
+          )}
+
+          {/* Market Insights */}
+          {(marketData || (!categoryId && false)) && (
+            <MarketInsights data={marketData} loading={false} />
+          )}
+
+          {/* AI Assistant Card (only when no suggestion yet) */}
+          {!priceSuggestion && !aiLoading && (
+            <div className="rounded-2xl border border-brand-purple/20 bg-brand-purple/5 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-purple to-brand-blue flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900">Assistente IA de Preços</h4>
+                  <p className="text-[10px] text-gray-500">Preencha título e categoria para ativar</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-bold text-gray-900">Assistente IA</h4>
-                <p className="text-[10px] text-gray-500">Recursos que chegam em breve</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: 'Gerar título', icon: Wand2, toast: 'Em breve: IA gerará o título automaticamente' },
+                  { label: 'Sugerir preço', icon: DollarSign, toast: title && categoryId ? '' : 'Preencha título e categoria primeiro' },
+                  { label: 'Gerar descrição', icon: FileText, toast: 'Em breve: descrição automática por IA' },
+                ].map(({ label, icon: Icon, toast: t }) => (
+                  <button
+                    key={label}
+                    onClick={() => t && showToast(t)}
+                    className="flex flex-col items-center gap-1.5 p-2.5 bg-white rounded-xl border border-brand-purple/10 hover:border-brand-purple/30 hover:bg-brand-purple/5 transition-all text-center"
+                  >
+                    <Icon className="w-4 h-4 text-brand-purple" />
+                    <span className="text-[10px] text-gray-600 font-medium leading-tight">{label}</span>
+                    <span className="text-[9px] text-brand-orange font-bold">
+                      {label === 'Sugerir preço' ? 'Automático' : 'Em breve'}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: 'Gerar título', icon: Wand2, toast: 'Em breve: IA gerará o título automaticamente' },
-                { label: 'Sugerir preço', icon: DollarSign, toast: 'Em breve: sugestão de preço por IA' },
-                { label: 'Gerar descrição', icon: FileText, toast: 'Em breve: descrição automática por IA' },
-              ].map(({ label, icon: Icon, toast: t }) => (
-                <button
-                  key={label}
-                  onClick={() => showToast(t)}
-                  className="flex flex-col items-center gap-1.5 p-2.5 bg-white rounded-xl border border-brand-purple/10 hover:border-brand-purple/30 hover:bg-brand-purple/5 transition-all text-center"
-                >
-                  <Icon className="w-4 h-4 text-brand-purple" />
-                  <span className="text-[10px] text-gray-600 font-medium leading-tight">{label}</span>
-                  <span className="text-[9px] text-brand-orange font-bold">Em breve</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -579,6 +690,23 @@ export default function NewProductPage() {
                   <p className="text-xs text-gray-400">{filledCount} foto{filledCount !== 1 ? 's' : ''} · {CATEGORIES.find(c => c.id === categoryId)?.name || 'Sem categoria'}</p>
                 </div>
               </div>
+
+              {priceSuggestion && (
+                <div className="flex items-center gap-3 p-3 bg-brand-purple/5 rounded-2xl">
+                  <Sparkles className="w-5 h-5 text-brand-purple flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-brand-purple">
+                      Preço analisado por IA · {priceSuggestion.confidence_score}% de confiança
+                    </p>
+                    <p className="text-[10px] text-gray-400">
+                      {priceSuggestion.market_position === 'excellent' && 'Excelente posição no mercado'}
+                      {priceSuggestion.market_position === 'competitive' && 'Preço competitivo'}
+                      {priceSuggestion.market_position === 'high' && 'Preço acima da média'}
+                      {priceSuggestion.market_position === 'very_high' && 'Preço muito acima da média'}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {autoVideo && (
                 <div className="flex items-center gap-3 p-3 bg-brand-purple/5 rounded-2xl">

@@ -68,7 +68,18 @@ export function useProducts() {
         console.warn('Supabase fetch failed, using mock:', fetchError.message);
         setProducts(MOCK_PRODUCTS as Product[]);
       } else if (data && data.length > 0) {
-        setProducts(data as Product[]);
+        // If real products exist but none have images, complement with mocks for demo
+        const hasAnyImage = data.some(
+          (p: any) => (p.images && p.images.length > 0) || p.video_thumbnail
+        );
+        if (!hasAnyImage) {
+          // Merge real products at top, mocks fill the rest (filtered out by id overlap)
+          const realIds = new Set(data.map((p: any) => p.id));
+          const mockFill = (MOCK_PRODUCTS as Product[]).filter((m) => !realIds.has(m.id));
+          setProducts([...(data as Product[]), ...mockFill]);
+        } else {
+          setProducts(data as Product[]);
+        }
       } else {
         // No products in DB yet, show mock for demo
         setProducts(MOCK_PRODUCTS as Product[]);

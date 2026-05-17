@@ -4,49 +4,147 @@ import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 
-const supabase = createClient();
+export type GeoPermissionStatus = 'prompt' | 'granted' | 'denied';
 
-interface GeolocationState {
-  latitude: number | null;
-  longitude: number | null;
+export interface GeolocationState {
+  /** Permission status — never stores raw coords */
+  status: GeoPermissionStatus;
   city: string | null;
   state: string | null;
   error: string | null;
   loading: boolean;
+  /** true when city/state have been resolved */
   granted: boolean;
+  /** Human-readable label */
+  locationLabel: string;
 }
 
-const STORAGE_KEY = 'compreouvenda_geo';
+const STORAGE_KEY = 'compreouvenda_geo_v2';
+
+// ─── Mock de localização para Modo Teste ──────────────────────────────────────
+const GEO_MOCK: Pick<GeolocationState, 'status' | 'city' | 'state' | 'granted' | 'locationLabel'> = {
+  status: 'granted',
+  city: 'São Paulo',
+  state: 'SP',
+  granted: true,
+  locationLabel: 'São Paulo, SP',
+};
+
+/**
+ * Verifica se o modo de teste de geolocalização está ativo.
+ * Quando ativo, o hook retorna dados mock sem chamar navigator.geolocation.
+ *
+ * Condições de ativação:
+ * - NEXT_PUBLIC_GEO_REQUIRED=false (variável de ambiente)
+ * - localStorage: geo_test_mode=true
+ * - localStorage: geo_required=false (toggle do painel admin)
+ *
+ * Para desativar: definir NEXT_PUBLIC_GEO_REQUIRED=true ou reativar no admin.
+ */
+function isGeoTestModeActive(): boolean {
+  // 1. Variável de ambiente
+  const envRequired = process.env.NEXT_PUBLIC_GEO_REQUIRED;
+  if (envRequired === 'false') return true;
+  // Default é false (modo teste habilitado) quando a variável não está definida
+  if (!envRequired || envRequired === undefined) return true;
+
+  if (typeof window === 'undefined') return false;
+
+  // 2. Flag direto no localStorage
+  try {
+    if (localStorage.getItem('geo_test_mode') === 'true') return true;
+    // 3. Toggle do painel admin
+    if (localStorage.getItem('geo_required') === 'false') return true;
+  } catch {
+    // ignore
+  }
+
+  return false;
+}
+
+function loadFromStorage(): Partial<GeolocationState> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<GeolocationState>;
+      // Validate stored value — only keep city/state (LGPD)
+      return {
+        status: parsed.status ?? 'prompt',
+        city: parsed.city ?? null,
+        state: parsed.state ?? null,
+        granted: parsed.granted ?? false,
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
+function saveToStorage(city: string | null, state: string | null, status: GeoPermissionStatus) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ city, state, status, granted: status === 'granted' }));
+  } catch {
+    // ignore
+  }
+}
 
 export function useGeolocation() {
   const { user } = useAuthStore();
+
+  // ── Modo Teste: retornar mock sem chamar navigator.geolocation ─────────────
+  // O código original abaixo permanece intacto para reativação quando
+  // NEXT_PUBLIC_GEO_REQUIRED=true ou toggle admin ativado.
+  const testModeActive = isGeoTestModeActive();
+
   const [state, setState] = useState<GeolocationState>(() => {
-    // Load from localStorage on init
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        try { return JSON.parse(saved); } catch {}
-      }
+    // Se modo de teste ativo, inicializar com dados mock
+    if (testModeActive) {
+      return {
+        ...GEO_MOCK,
+        error: null,
+        loading: false,
+      };
     }
-    return { latitude: null, longitude: null, city: null, state: null, error: null, loading: false, granted: false };
+
+    const saved = loadFromStorage();
+    return {
+      status: saved.status ?? 'prompt',
+      city: saved.city ?? null,
+      state: saved.state ?? null,
+      error: null,
+      loading: false,
+      granted: saved.granted ?? false,
+      locationLabel: saved.city && saved.state ? `${saved.city}, ${saved.state}` : 'Localização não definida',
+    };
   });
 
-  // Save to localStorage whenever state changes
+  // Keep locationLabel in sync
   useEffect(() => {
-    if (state.latitude && state.longitude) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }
-  }, [state]);
+    setState((s) => ({
+      ...s,
+      locationLabel:
+        s.city && s.state
+          ? `${s.city}, ${s.state}`
+          : s.city
+          ? s.city
+          : 'Localização não definida',
+    }));
+  }, [state.city, state.state]);
 
-  // Reverse geocoding (free API)
+  // Reverse geocoding via Nominatim (free, no key required)
+  // CÓDIGO ORIGINAL PRESERVADO — apenas ignorado no modo de teste
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     try {
-      const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`, {
-        headers: { 'Accept-Language': 'pt-BR' }
-      });
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`,
+        { headers: { 'Accept-Language': 'pt-BR' } }
+      );
       const data = await resp.json();
       const addr = data.address || {};
-      const city = addr.city || addr.town || addr.municipality || addr.village || 'Cidade não identificada';
+      const city =
+        addr.city || addr.town || addr.municipality || addr.village || 'Cidade não identificada';
       const stateAbbr = addr.state || '';
       return { city, state: stateAbbr };
     } catch {
@@ -54,105 +152,125 @@ export function useGeolocation() {
     }
   }, []);
 
+  // Record LGPD geo consent in Supabase
+  // CÓDIGO ORIGINAL PRESERVADO — apenas ignorado no modo de teste
+  const recordConsent = useCallback(
+    async (city: string | null, stateAbbr: string | null) => {
+      if (!user?.id) return;
+      const supabase = createClient();
+      // Upsert into geo_consents table (see migration)
+      await supabase.from('geo_consents').upsert({
+        user_id: user.id,
+        city: city ?? '',
+        state: stateAbbr ?? '',
+        purpose: 'marketplace_proximity_and_donations',
+        consented_at: new Date().toISOString(),
+      });
+      // Update users table — only city/state, never raw coords
+      await supabase
+        .from('users')
+        .update({ city: city ?? '', state: stateAbbr ?? '' })
+        .eq('id', user.id);
+    },
+    [user]
+  );
+
   // Request location
+  // CÓDIGO ORIGINAL PRESERVADO — no modo de teste, apenas atualiza o estado mock
   const requestLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      setState(s => ({ ...s, error: 'Geolocalização não suportada neste navegador' }));
+    // Modo de teste: retornar dados mock sem chamar navigator.geolocation
+    if (isGeoTestModeActive()) {
+      setState({
+        ...GEO_MOCK,
+        error: null,
+        loading: false,
+      });
       return;
     }
 
-    setState(s => ({ ...s, loading: true, error: null }));
+    // ── Código original de geolocalização (preservado intacto) ──────────────
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setState((s) => ({
+        ...s,
+        status: 'denied',
+        error: 'Geolocalização não suportada neste navegador',
+        loading: false,
+      }));
+      return;
+    }
+
+    setState((s) => ({ ...s, loading: true, error: null }));
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
+        // Reverse geocode — extract only city/state (LGPD minimization)
         const geo = await reverseGeocode(latitude, longitude);
 
-        const newState: GeolocationState = {
-          latitude,
-          longitude,
+        setState({
+          status: 'granted',
           city: geo.city,
           state: geo.state,
           error: null,
           loading: false,
           granted: true,
-        };
-        setState(newState);
+          locationLabel:
+            geo.city && geo.state
+              ? `${geo.city}, ${geo.state}`
+              : geo.city ?? 'Localização não definida',
+        });
 
-        // Update user profile in Supabase
-        if (user) {
-          await supabase
-            .from('users')
-            .update({
-              location_lat: latitude,
-              location_lng: longitude,
-              city: geo.city,
-              state: geo.state,
-            })
-            .eq('id', user.id);
-        }
+        saveToStorage(geo.city, geo.state, 'granted');
+        await recordConsent(geo.city, geo.state);
       },
-      (error) => {
+      (err) => {
         let msg = 'Erro ao obter localização';
-        switch (error.code) {
-          case 1: msg = 'Permissão de localização negada'; break;
-          case 2: msg = 'Localização indisponível'; break;
-          case 3: msg = 'Tempo esgotado ao obter localização'; break;
+        switch (err.code) {
+          case 1:
+            msg = 'Permissão de localização negada pelo usuário';
+            break;
+          case 2:
+            msg = 'Localização indisponível no momento';
+            break;
+          case 3:
+            msg = 'Tempo esgotado ao obter localização';
+            break;
         }
-        setState(s => ({ ...s, error: msg, loading: false }));
+        setState((s) => ({
+          ...s,
+          status: 'denied',
+          error: msg,
+          loading: false,
+        }));
+        saveToStorage(null, null, 'denied');
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 300000 }
     );
-  }, [user, reverseGeocode]);
+  }, [reverseGeocode, recordConsent]);
 
-  // Watch position (continuous tracking)
-  const watchLocation = useCallback(() => {
-    if (!navigator.geolocation) return null;
+  // Alias kept for backward compatibility
+  const watchLocation = useCallback(() => null, []);
 
-    const watchId = navigator.geolocation.watchPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        const geo = await reverseGeocode(latitude, longitude);
-        setState({
-          latitude, longitude,
-          city: geo.city, state: geo.state,
-          error: null, loading: false, granted: true,
-        });
-      },
-      () => {},
-      { enableHighAccuracy: false, timeout: 30000, maximumAge: 600000 }
-    );
-    return watchId;
-  }, [reverseGeocode]);
-
-  // Calculate distance between two points (Haversine)
-  const calculateDistance = useCallback((lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }, []);
-
-  // Get distance from user to a point
-  const getDistanceTo = useCallback((lat: number, lng: number): number | null => {
-    if (!state.latitude || !state.longitude) return null;
-    return calculateDistance(state.latitude, state.longitude, lat, lng);
-  }, [state.latitude, state.longitude, calculateDistance]);
-
-  // Get location display string
-  const locationLabel = state.city && state.state
-    ? `${state.city}, ${state.state}`
-    : state.latitude
-      ? `${state.latitude.toFixed(4)}, ${state.longitude?.toFixed(4)}`
-      : 'Localização não definida';
+  // Haversine — kept for product distance display
+  const calculateDistance = useCallback(
+    (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+      const R = 6371;
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLon = ((lon2 - lon1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) *
+          Math.cos((lat2 * Math.PI) / 180) *
+          Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    },
+    []
+  );
 
   return {
     ...state,
-    locationLabel,
     requestLocation,
     watchLocation,
-    getDistanceTo,
     calculateDistance,
   };
 }

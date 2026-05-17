@@ -163,3 +163,12 @@ export interface Notification {
   data?: Record<string, unknown>;
   created_at: string;
 }
+
+export interface LGPDConsents {
+  terms_accepted: boolean;
+  privacy_accepted: boolean;
+  geolocation_accepted: boolean;
+  marketing_accepted: boolean;
+  version: string;
+  timestamp: string;
+}

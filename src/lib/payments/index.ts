@@ -3,11 +3,26 @@
  * Supports: MercadoPago (primary), Stripe (fallback)
  * Methods: PIX, Credit Card
  * Features: Split payments (seller, platform, commission, donation)
+ * Escrow: Funds held on payment confirmation, released after QR Code scan
  */
 
 import { createClient } from '@/lib/supabase/client';
 
 const supabase = createClient();
+
+// ==================== ESCROW TRIGGER (client-side) ====================
+// After server confirms payment, triggers escrow hold via API route
+async function triggerEscrowHold(orderId: string, amount: number, buyerId: string, sellerId: string): Promise<void> {
+  try {
+    await fetch('/api/escrow/hold', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId, amount, buyerId, sellerId }),
+    });
+  } catch {
+    // Non-blocking — admin can trigger manually if needed
+  }
+}
 
 // ==================== TYPES ====================
 
@@ -187,9 +202,12 @@ async function processCreditPayment(orderId: string, request: CreatePaymentReque
   if (approved) {
     await supabase.from('orders').update({
       payment_gateway_id: 'cc_' + Date.now(),
-      payment_status: 'approved',
-      status: 'paid',
+      payment_status: 'held',
+      status: 'payment_held',
     }).eq('id', orderId);
+
+    // Trigger escrow hold
+    await triggerEscrowHold(orderId, request.totalAmount, request.buyerId, request.sellerId);
 
     // Notify seller
     await supabase.from('notifications').insert({

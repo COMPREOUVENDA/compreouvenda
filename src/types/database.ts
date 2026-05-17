@@ -28,7 +28,83 @@ export interface Database {
       support_tickets: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown> };
       notifications: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown> };
       admin_audit_logs: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown> };
+      // audit_logs: tabela ativa para LGPD/auditoria de acoes de usuario (criada por scripts/create-audit-logs.js).
+      // Distinta de admin_audit_logs (schema original, auditoria de acoes de admin).
+      // O codigo em src/lib/audit.ts e src/app/admin/audit-logs/page.tsx usa esta tabela.
+      audit_logs: {
+        Row: {
+          id: string;
+          actor_id: string;
+          actor_email: string | null;
+          action: string;
+          target_type: string;
+          target_id: string | null;
+          target_email: string | null;
+          details: Record<string, unknown> | null;
+          ip_address: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          actor_id: string;
+          actor_email?: string | null;
+          action: string;
+          target_type: string;
+          target_id?: string | null;
+          target_email?: string | null;
+          details?: Record<string, unknown> | null;
+          ip_address?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          actor_email?: string | null;
+          action?: string;
+          target_type?: string;
+          target_id?: string | null;
+          target_email?: string | null;
+          details?: Record<string, unknown> | null;
+          ip_address?: string | null;
+        };
+      };
       system_settings: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown> };
+      user_consents: {
+        Row: {
+          id: string;
+          user_id: string;
+          subject: string;
+          purpose: string;
+          legal_basis: string;
+          version: string;
+          granted: boolean;
+          granted_at: string;
+          source: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          subject: string;
+          purpose?: string;
+          legal_basis?: string;
+          version?: string;
+          granted: boolean;
+          granted_at?: string;
+          source?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          subject?: string;
+          purpose?: string;
+          legal_basis?: string;
+          version?: string;
+          granted?: boolean;
+          granted_at?: string;
+          source?: string;
+          updated_at?: string;
+        };
+      };
     };
   };
 }
