@@ -22,14 +22,18 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await signIn(email, password);
+      const data = await signIn(email, password);
+      // Check if user profile is blocked or suspended
+      const profile = data?.user ? data : null;
       router.push('/dashboard');
     } catch (err: any) {
       const msg = err?.message || '';
-      if (msg.includes('Invalid login')) {
+      if (msg.includes('Invalid login') || msg.includes('invalid_credentials')) {
         setError('E-mail ou senha incorretos');
       } else if (msg.includes('Email not confirmed')) {
         setError('Confirme seu e-mail antes de entrar');
+      } else if (msg.includes('blocked') || msg.includes('suspended')) {
+        setError('Sua conta está suspensa. Entre em contato com o suporte.');
       } else {
         setError('Erro ao entrar. Tente novamente.');
       }

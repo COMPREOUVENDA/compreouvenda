@@ -8,7 +8,7 @@ import {
   User, Mail, Lock, Phone, MapPin, ChevronRight, ChevronLeft,
   ShoppingBag, Store, Heart, Loader2, Eye, EyeOff,
   CheckCircle2, XCircle, FileText, Calendar, Home, Check,
-  ShieldAlert, AlertTriangle, Navigation,
+  ShieldAlert, AlertTriangle, Navigation, ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -16,10 +16,11 @@ import {
   validateCPF, validateCNPJ, validateEmail, validate18Plus,
   getPasswordStrength, lookupCep,
 } from '@/lib/masks';
+import type { LGPDConsents } from '@/types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STEPS = ['Conta', 'Dados', 'Endereço', 'Confirmar'];
+const STEPS = ['Conta', 'Dados', 'Endereço', 'Consentimentos', 'Confirmar'];
 
 const USER_TYPES = [
   { type: 'buyer', icon: ShoppingBag, label: 'Comprador', desc: 'Quero comprar produtos' },
@@ -31,6 +32,8 @@ const BR_STATES = [
   'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG',
   'PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
 ];
+
+const CONSENTS_VERSION = '1.0';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,7 +59,7 @@ interface FormData {
   estado: string;
   lat: number | null;
   lng: number | null;
-  // Step 4
+  // Step 4 (legacy - kept for compat)
   acceptTerms: boolean;
 }
 
@@ -75,6 +78,41 @@ function useFieldStatus(initial: FieldStatus = { touched: false, valid: false, m
   return { status, setStatus };
 }
 
+// ─── Checkbox LGPD component ─────────────────────────────────────────────────
+
+interface ConsentCheckboxProps {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  required?: boolean;
+  children: React.ReactNode;
+}
+
+function ConsentCheckbox({ checked, onChange, required, children }: ConsentCheckboxProps) {
+  return (
+    <label className="flex items-start gap-3 cursor-pointer group">
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`w-5 h-5 shrink-0 rounded border-2 flex items-center justify-center transition-all mt-0.5 focus:outline-none focus:ring-2 focus:ring-[#5B2D8E]/40 ${
+          checked
+            ? 'bg-[#5B2D8E] border-[#5B2D8E]'
+            : 'border-gray-300 group-hover:border-[#5B2D8E]/60 bg-white'
+        }`}
+      >
+        {checked && <Check className="w-3 h-3 text-white" />}
+      </button>
+      <span className="text-sm text-gray-700 leading-relaxed">
+        {children}
+        {required && (
+          <span className="ml-1 text-xs text-gray-400 font-normal">(obrigatório)</span>
+        )}
+      </span>
+    </label>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function RegisterPage() {
@@ -89,11 +127,26 @@ export default function RegisterPage() {
   const [cepLoading, setCepLoading] = useState(false);
   const [cepError, setCepError] = useState('');
 
+  // ─── Consentimentos LGPD ────────────────────────────────────────────────────
+  const [consents, setConsents] = useState<LGPDConsents>({
+    terms_accepted: false,
+    privacy_accepted: false,
+    geolocation_accepted: true,
+    marketing_accepted: true,
+    version: CONSENTS_VERSION,
+    timestamp: '',
+  });
+  const [consentsError, setConsentsError] = useState('');
+
+  const setConsent = useCallback((key: keyof LGPDConsents, value: boolean | string) => {
+    setConsents((prev) => ({ ...prev, [key]: value }));
+    setConsentsError('');
+  }, []);
+
   // ─── Geolocation state ──────────────────────────────────────────────────────
   const [geoPhase, setGeoPhase] = useState<GeoPhase>('consent');
   const [geoError, setGeoError] = useState('');
   const [showBrowserHelp, setShowBrowserHelp] = useState(false);
-  // Divergence: CEP city/state vs GPS city/state
   const [cepDivergence, setCepDivergence] = useState<{
     cepCity: string; cepState: string; gpsCity: string; gpsState: string;
   } | null>(null);
@@ -203,7 +256,6 @@ export default function RegisterPage() {
               cidade: found.cidade,
               estado: found.estado,
             };
-            // Check divergence vs GPS
             if (prev.lat && prev.lng) {
               const gpsCity = prev.cidade;
               const gpsState = prev.estado;
@@ -216,7 +268,6 @@ export default function RegisterPage() {
                   gpsCity,
                   gpsState,
                 });
-                // Don't auto-override city/state from CEP; keep GPS values
                 return { ...prev, cep: masked, rua: found.rua, bairro: found.bairro };
               }
             }
@@ -277,29 +328,38 @@ export default function RegisterPage() {
   const validateStep1 = () => {
     let ok = true;
 
+    // CPF/CNPJ é opcional — validar formato apenas se preenchido
     const rawDoc = formData.document.replace(/\D/g, '');
-    if (formData.personType === 'cpf') {
-      if (!validateCPF(rawDoc)) {
-        documentStatus.setStatus({ touched: true, valid: false, message: 'CPF inválido' });
-        ok = false;
+    if (rawDoc.length > 0) {
+      if (formData.personType === 'cpf') {
+        if (!validateCPF(rawDoc)) {
+          documentStatus.setStatus({ touched: true, valid: false, message: 'CPF inválido' });
+          ok = false;
+        } else {
+          documentStatus.setStatus({ touched: true, valid: true, message: '' });
+        }
       } else {
-        documentStatus.setStatus({ touched: true, valid: true, message: '' });
+        if (!validateCNPJ(rawDoc)) {
+          documentStatus.setStatus({ touched: true, valid: false, message: 'CNPJ inválido' });
+          ok = false;
+        } else {
+          documentStatus.setStatus({ touched: true, valid: true, message: '' });
+        }
       }
     } else {
-      if (!validateCNPJ(rawDoc)) {
-        documentStatus.setStatus({ touched: true, valid: false, message: 'CNPJ inválido' });
-        ok = false;
-      } else {
-        documentStatus.setStatus({ touched: true, valid: true, message: '' });
-      }
+      documentStatus.setStatus({ touched: false, valid: false, message: '' });
     }
 
     if (formData.personType === 'cpf') {
-      if (!validate18Plus(formData.birthDate)) {
-        birthStatus.setStatus({ touched: true, valid: false, message: 'Você deve ter 18 anos ou mais' });
-        ok = false;
-      } else {
-        birthStatus.setStatus({ touched: true, valid: true, message: '' });
+      // Birth date is optional — only validate if filled in
+      const rawDate = formData.birthDate.replace(/\D/g, '');
+      if (rawDate.length > 0) {
+        if (!validate18Plus(formData.birthDate)) {
+          birthStatus.setStatus({ touched: true, valid: false, message: 'Você deve ter 18 anos ou mais' });
+          ok = false;
+        } else {
+          birthStatus.setStatus({ touched: true, valid: true, message: '' });
+        }
       }
     }
 
@@ -312,22 +372,46 @@ export default function RegisterPage() {
   };
 
   const validateStep2 = () => {
-    if (!formData.lat || !formData.lng) {
-      setGlobalError('Localização obrigatória. Permita o acesso à sua localização para continuar.');
-      return false;
-    }
+    // GPS is optional — users can proceed without it
     return true;
   };
+
+  const validateStep3 = () => {
+    if (!consents.terms_accepted || !consents.privacy_accepted) {
+      setConsentsError('Você precisa aceitar os Termos de Uso e a Política de Privacidade para continuar.');
+      return false;
+    }
+    // Geolocation consent is optional — do not block registration
+    setConsentsError('');
+    return true;
+  };
+
+  // ─── Save consents to localStorage ──────────────────────────────────────────
+
+  const saveConsentsToStorage = useCallback((finalConsents: LGPDConsents) => {
+    try {
+      localStorage.setItem('consents_v1', JSON.stringify(finalConsents));
+    } catch {
+      // localStorage may be unavailable (SSR safety)
+    }
+  }, []);
 
   // ─── Submit ─────────────────────────────────────────────────────────────────
 
   const handleSubmit = async () => {
-    if (!formData.acceptTerms) {
-      setGlobalError('Aceite os Termos de Uso para continuar');
-      return;
-    }
     setGlobalError('');
     setLoading(true);
+
+    const finalConsents: LGPDConsents = {
+      ...consents,
+      timestamp: new Date().toISOString(),
+    };
+
+    // Persist to localStorage
+    saveConsentsToStorage(finalConsents);
+
+    // Also keep legacy flag in sync
+    set('acceptTerms', finalConsents.terms_accepted && finalConsents.privacy_accepted);
 
     try {
       await signUp(formData.email, formData.password, formData.name, formData.userType, {
@@ -337,6 +421,7 @@ export default function RegisterPage() {
         state: formData.estado,
         lat: formData.lat ?? undefined,
         lng: formData.lng ?? undefined,
+        consents: finalConsents,
       });
       router.push('/dashboard');
     } catch (err: unknown) {
@@ -362,11 +447,13 @@ export default function RegisterPage() {
     if (step === 0 && !validateStep0()) return;
     if (step === 1 && !validateStep1()) return;
     if (step === 2 && !validateStep2()) return;
+    if (step === 3 && !validateStep3()) return;
     setStep((s) => s + 1);
   };
 
   const goBack = () => {
     setGlobalError('');
+    setConsentsError('');
     setStep((s) => s - 1);
   };
 
@@ -626,7 +713,19 @@ export default function RegisterPage() {
           {step === 1 && (
             <>
               <h2 className="font-display font-bold text-2xl text-gray-900 text-center mb-1">Dados pessoais</h2>
-              <p className="text-gray-400 text-center text-sm mb-7">Precisamos verificar sua identidade</p>
+              <p className="text-gray-400 text-center text-sm mb-5">Precisamos verificar sua identidade</p>
+
+              {/* Nota LGPD - minimização de dados */}
+              <div className="flex items-start gap-2 mb-5 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                <ShieldCheck className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  Coletamos apenas o necessário para operar a plataforma.{' '}
+                  <Link href="/privacidade" target="_blank" className="text-[#F5921E] hover:underline font-medium">
+                    Veja nossa Política de Privacidade
+                  </Link>
+                  .
+                </p>
+              </div>
 
               <div className="space-y-5">
 
@@ -656,7 +755,7 @@ export default function RegisterPage() {
                     <FileText className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="text"
-                      placeholder={formData.personType === 'cpf' ? 'CPF: XXX.XXX.XXX-XX' : 'CNPJ: XX.XXX.XXX/XXXX-XX'}
+                      placeholder={formData.personType === 'cpf' ? 'CPF: XXX.XXX.XXX-XX (opcional)' : 'CNPJ: XX.XXX.XXX/XXXX-XX (opcional)'}
                       value={formData.document}
                       onChange={(e) => {
                         const masked = formData.personType === 'cpf'
@@ -664,12 +763,16 @@ export default function RegisterPage() {
                           : maskCNPJ(e.target.value);
                         set('document', masked);
                         const raw = masked.replace(/\D/g, '');
-                        const v = formData.personType === 'cpf' ? validateCPF(raw) : validateCNPJ(raw);
-                        documentStatus.setStatus({
-                          touched: true,
-                          valid: v,
-                          message: v ? '' : `${formData.personType.toUpperCase()} inválido`,
-                        });
+                        if (raw.length > 0) {
+                          const v = formData.personType === 'cpf' ? validateCPF(raw) : validateCNPJ(raw);
+                          documentStatus.setStatus({
+                            touched: true,
+                            valid: v,
+                            message: v ? '' : `${formData.personType.toUpperCase()} inválido`,
+                          });
+                        } else {
+                          documentStatus.setStatus({ touched: false, valid: false, message: '' });
+                        }
                       }}
                       className={`input-field pl-11 pr-9 ${borderClass(documentStatus.status)}`}
                     />
@@ -678,6 +781,7 @@ export default function RegisterPage() {
                   {documentStatus.status.touched && !documentStatus.status.valid && (
                     <p className="mt-1 text-xs text-red-500">{documentStatus.status.message}</p>
                   )}
+                  <p className="mt-1 text-xs text-gray-400">Necessário apenas para vendedores e pagamentos.</p>
                 </div>
 
                 {/* Date of birth (CPF only) */}
@@ -796,6 +900,12 @@ export default function RegisterPage() {
                       <Navigation className="w-4 h-4" />
                       Permitir Localização
                     </button>
+                    <button
+                      onClick={() => goNext()}
+                      className="mt-3 text-xs text-gray-400 hover:text-gray-600 underline w-full text-center"
+                    >
+                      Continuar sem localização
+                    </button>
                   </div>
                 </div>
               )}
@@ -819,24 +929,27 @@ export default function RegisterPage() {
                       <ShieldAlert className="w-8 h-8 text-red-500" />
                     </div>
                     <h3 className="font-display font-bold text-lg text-gray-900 mb-2">
-                      Localização necessária
+                      Localização não disponível
                     </h3>
                     <p className="text-sm text-gray-600 mb-3">
-                      O acesso à sua localização é obrigatório para cadastro na plataforma. Isso garante que os produtos
-                      exibidos estejam realmente próximos a você e aumenta a confiabilidade para todos os usuários.
+                      Não conseguimos acessar sua localização. Você pode tentar novamente ou continuar
+                      sem localização — a plataforma funciona normalmente, mas sem geolocalização automática.
                     </p>
                     {geoError && (
                       <p className="text-xs text-red-500 mb-3 bg-red-100 px-3 py-1.5 rounded-lg">{geoError}</p>
                     )}
-                    <p className="text-sm text-gray-500 mb-4">
-                      Para continuar, permita o acesso nas configurações do seu navegador e tente novamente.
-                    </p>
                     <button
                       onClick={requestGps}
                       className="btn-primary w-full flex items-center justify-center gap-2 mb-3"
                     >
                       <Navigation className="w-4 h-4" />
                       Tentar novamente
+                    </button>
+                    <button
+                      onClick={() => goNext()}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all mb-2"
+                    >
+                      Continuar sem localização
                     </button>
                     <button
                       onClick={() => setShowBrowserHelp((v) => !v)}
@@ -890,7 +1003,6 @@ export default function RegisterPage() {
                       <div className="flex gap-2 pt-1">
                         <button
                           onClick={() => {
-                            // Use GPS values (already set)
                             setCepDivergence(null);
                           }}
                           className="flex-1 text-xs font-semibold py-2 px-3 bg-brand-purple text-white rounded-lg hover:bg-brand-purple/90 transition-all"
@@ -899,7 +1011,6 @@ export default function RegisterPage() {
                         </button>
                         <button
                           onClick={() => {
-                            // Accept CEP city/state, save divergence flag
                             setFormData((prev) => ({
                               ...prev,
                               cidade: cepDivergence.cepCity,
@@ -999,14 +1110,120 @@ export default function RegisterPage() {
             </>
           )}
 
-          {/* ── Step 3: Confirmar ────────────────────────────────────────────── */}
+          {/* ── Step 3: Consentimentos LGPD ──────────────────────────────────── */}
           {step === 3 && (
+            <>
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <ShieldCheck className="w-6 h-6 text-[#5B2D8E]" />
+                <h2 className="font-display font-bold text-2xl text-gray-900 text-center">Seus consentimentos</h2>
+              </div>
+              <p className="text-gray-400 text-center text-sm mb-6">
+                De acordo com a LGPD, precisamos do seu consentimento para os itens abaixo.
+              </p>
+
+              {consentsError && (
+                <div className="mb-5 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+                  {consentsError}
+                </div>
+              )}
+
+              <div className="space-y-5">
+
+                {/* Consent 1: Termos + Privacidade */}
+                <div className={`p-4 rounded-2xl border-2 transition-all ${
+                  consents.terms_accepted && consents.privacy_accepted
+                    ? 'border-[#5B2D8E]/30 bg-[#5B2D8E]/5'
+                    : 'border-gray-200 bg-white'
+                }`}>
+                  <ConsentCheckbox
+                    checked={consents.terms_accepted && consents.privacy_accepted}
+                    onChange={(v) => {
+                      setConsent('terms_accepted', v);
+                      setConsent('privacy_accepted', v);
+                    }}
+                    required
+                  >
+                    Aceito os{' '}
+                    <Link
+                      href="/terms"
+                      target="_blank"
+                      className="text-[#F5921E] font-semibold hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Termos de Uso
+                    </Link>{' '}
+                    e a{' '}
+                    <Link
+                      href="/privacy"
+                      target="_blank"
+                      className="text-[#F5921E] font-semibold hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Política de Privacidade
+                    </Link>
+                  </ConsentCheckbox>
+                  <p className="mt-2 ml-8 text-xs text-gray-400">
+                    Base legal: execução de contrato (Art. 7°, V – LGPD)
+                  </p>
+                </div>
+
+                {/* Consent 2: Geolocalização */}
+                <div className={`p-4 rounded-2xl border-2 transition-all ${
+                  consents.geolocation_accepted
+                    ? 'border-[#5B2D8E]/30 bg-[#5B2D8E]/5'
+                    : 'border-gray-200 bg-white'
+                }`}>
+                  <ConsentCheckbox
+                    checked={consents.geolocation_accepted}
+                    onChange={(v) => setConsent('geolocation_accepted', v)}
+                    required
+                  >
+                    Concordo com o uso da minha localização para conectar com compradores/vendedores próximos
+                  </ConsentCheckbox>
+                  <p className="mt-2 ml-8 text-xs text-gray-400">
+                    Base legal: execução de contrato (Art. 7°, V – LGPD)
+                  </p>
+                </div>
+
+                {/* Consent 3: Marketing (opcional) */}
+                <div className={`p-4 rounded-2xl border-2 transition-all ${
+                  consents.marketing_accepted
+                    ? 'border-[#5B2D8E]/30 bg-[#5B2D8E]/5'
+                    : 'border-gray-200 bg-white'
+                }`}>
+                  <ConsentCheckbox
+                    checked={consents.marketing_accepted}
+                    onChange={(v) => setConsent('marketing_accepted', v)}
+                  >
+                    Desejo receber comunicações promocionais por e-mail e push
+                  </ConsentCheckbox>
+                  <p className="mt-2 ml-8 text-xs text-gray-400">
+                    Opcional — base legal: consentimento (Art. 7°, I – LGPD). Você pode revogar a qualquer momento.
+                  </p>
+                </div>
+
+                {/* Info box */}
+                <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-xl border border-blue-100">
+                  <ShieldCheck className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-blue-700">
+                    Seus dados são protegidos pela Lei Geral de Proteção de Dados (LGPD – Lei 13.709/2018).
+                    Você pode gerenciar seus consentimentos nas configurações da conta.
+                  </p>
+                </div>
+
+                <button onClick={goNext} className="btn-primary w-full flex items-center justify-center gap-2">
+                  Continuar <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── Step 4: Confirmar ────────────────────────────────────────────── */}
+          {step === 4 && (
             <>
               <h2 className="font-display font-bold text-2xl text-gray-900 text-center mb-1">Confirmar dados</h2>
               <p className="text-gray-400 text-center text-sm mb-6">Verifique suas informações</p>
-
-              {/* Summary */}
-              <div className="bg-gray-50 rounded-2xl p-4 mb-6 space-y-3 text-sm">
+              <div className="bg-gray-50 rounded-2xl p-4 mb-5 space-y-3 text-sm">
                 <SummaryRow label="Nome" value={formData.name} />
                 <SummaryRow label="E-mail" value={formData.email} />
                 <SummaryRow label="Telefone" value={formData.phone || '—'} />
@@ -1029,35 +1246,33 @@ export default function RegisterPage() {
                     value={`${formData.cidade}${formData.estado ? ' / ' + formData.estado : ''}`}
                   />
                 )}
-                {formData.lat && formData.lng && (
-                  <SummaryRow
-                    label="Coordenadas"
-                    value={`${formData.lat.toFixed(4)}, ${formData.lng.toFixed(4)}`}
-                  />
-                )}
               </div>
 
-              {/* Terms */}
-              <label className="flex items-start gap-3 cursor-pointer mb-6">
-                <div
-                  onClick={() => set('acceptTerms', !formData.acceptTerms)}
-                  className={`w-5 h-5 shrink-0 rounded border-2 flex items-center justify-center transition-all mt-0.5 ${
-                    formData.acceptTerms ? 'bg-brand-purple border-brand-purple' : 'border-gray-300'
-                  }`}
-                >
-                  {formData.acceptTerms && <Check className="w-3 h-3 text-white" />}
+              {/* Consents summary */}
+              <div className="bg-[#5B2D8E]/5 border border-[#5B2D8E]/20 rounded-2xl p-4 mb-6 space-y-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <ShieldCheck className="w-4 h-4 text-[#5B2D8E]" />
+                  <span className="text-sm font-semibold text-[#5B2D8E]">Consentimentos LGPD</span>
                 </div>
-                <span className="text-sm text-gray-600">
-                  Li e aceito os{' '}
-                  <Link href="/terms" className="text-brand-purple font-semibold hover:underline" target="_blank">
-                    Termos de Uso
-                  </Link>{' '}
-                  e a{' '}
-                  <Link href="/privacy" className="text-brand-purple font-semibold hover:underline" target="_blank">
-                    Política de Privacidade
-                  </Link>
-                </span>
-              </label>
+                <ConsentSummaryRow
+                  label="Termos de Uso e Privacidade"
+                  granted={consents.terms_accepted && consents.privacy_accepted}
+                />
+                <ConsentSummaryRow
+                  label="Uso de localização"
+                  granted={consents.geolocation_accepted}
+                />
+                <ConsentSummaryRow
+                  label="Comunicações promocionais"
+                  granted={consents.marketing_accepted}
+                  optional
+                />
+              </div>
+
+              {/* Nota: dados adicionais podem ser completados depois */}
+              <p className="text-xs text-gray-400 text-center mb-6 -mt-2">
+                Você pode completar dados adicionais depois no seu perfil.
+              </p>
 
               <button
                 onClick={handleSubmit}
@@ -1110,6 +1325,29 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between items-start gap-2">
       <span className="text-gray-400 shrink-0">{label}</span>
       <span className="font-medium text-gray-800 text-right break-all">{value}</span>
+    </div>
+  );
+}
+
+// ─── Consent Summary Row ─────────────────────────────────────────────────────
+
+function ConsentSummaryRow({
+  label, granted, optional,
+}: {
+  label: string; granted: boolean; optional?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <span className="text-gray-600">{label}{optional ? ' (opcional)' : ''}</span>
+      {granted ? (
+        <span className="flex items-center gap-1 text-green-600 font-semibold">
+          <Check className="w-3 h-3" /> Sim
+        </span>
+      ) : (
+        <span className="flex items-center gap-1 text-gray-400 font-semibold">
+          <XCircle className="w-3 h-3" /> Não
+        </span>
+      )}
     </div>
   );
 }
