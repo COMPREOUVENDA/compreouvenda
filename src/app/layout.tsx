@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { WebSiteJsonLd, OrganizationJsonLd } from '@/components/seo/JsonLd';
+import GeoProvider from '@/components/geo/GeoProvider';
+import CookieBanner from '@/components/cookies/CookieBanner';
+import SellButton from '@/components/ui/SellButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,7 +86,13 @@ export default function RootLayout({
         >
           Pular para o conteúdo
         </a>
-        {children}
+        <GeoProvider>
+          {children}
+        </GeoProvider>
+        {/* Cookie banner fora do GeoProvider para não depender de geolocalização */}
+        <CookieBanner />
+        {/* Global FAB - Anunciar Agora (hidden on /product/new) */}
+        <SellButton />
         <script
           dangerouslySetInnerHTML={{
             __html: `

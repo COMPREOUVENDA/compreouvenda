@@ -7,6 +7,7 @@ import ProductCard from '@/components/product/ProductCard';
 import { ProductCardSkeleton } from '@/components/product/ProductCardSkeleton';
 import { CATEGORIES } from '@/lib/constants';
 import { useProducts } from '@/hooks/useProducts';
+import HeroCTA from '@/components/home/HeroCTA';
 import type { Product } from '@/types';
 
 // Dynamic import for heavy ad carousel
@@ -77,6 +78,9 @@ export default function HomePage() {
           </button>
         </div>
       </div>
+
+      {/* Hero CTA - Seller conversion banner */}
+      <HeroCTA />
 
       {/* Hero Ad Carousel (Home top) */}
       <div className="py-2">
