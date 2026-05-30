@@ -7,6 +7,7 @@ import SellButton from '@/components/ui/SellButton';
 import PushPermissionBanner from '@/components/notifications/PushPermissionBanner';
 import { Analytics } from '@/components/Analytics';
 import { Chatbot } from '@/components/chat/Chatbot';
+import { ToastProvider } from '@/components/ui/Toast';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,7 +92,9 @@ export default function RootLayout({
           Pular para o conteúdo
         </a>
         <GeoProvider>
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </GeoProvider>
         {/* Cookie banner fora do GeoProvider para não depender de geolocalização */}
         <CookieBanner />
