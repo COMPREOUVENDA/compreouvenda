@@ -6,6 +6,7 @@ import CookieBanner from '@/components/cookies/CookieBanner';
 import SellButton from '@/components/ui/SellButton';
 import PushPermissionBanner from '@/components/notifications/PushPermissionBanner';
 import { Analytics } from '@/components/Analytics';
+import { Chatbot } from '@/components/chat/Chatbot';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,6 +99,7 @@ export default function RootLayout({
         <PushPermissionBanner />
         {/* Global FAB - Anunciar Agora (hidden on /product/new) */}
         <SellButton />
+        <Chatbot />
         <script
           dangerouslySetInnerHTML={{
             __html: `
