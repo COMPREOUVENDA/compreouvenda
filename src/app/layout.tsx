@@ -5,6 +5,7 @@ import GeoProvider from '@/components/geo/GeoProvider';
 import CookieBanner from '@/components/cookies/CookieBanner';
 import SellButton from '@/components/ui/SellButton';
 import PushPermissionBanner from '@/components/notifications/PushPermissionBanner';
+import { Analytics } from '@/components/Analytics';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,6 +81,7 @@ export default function RootLayout({
         <OrganizationJsonLd />
       </head>
       <body className="min-h-screen">
+        <Analytics />
         {/* Skip to main content for accessibility */}
         <a
           href="#main-content"
