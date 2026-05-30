@@ -3,9 +3,10 @@
 import { useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Bell, MapPin, Loader2, WifiOff } from 'lucide-react';
+import { MapPin, Loader2, WifiOff } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import NotificationCenter from '@/components/notifications/NotificationCenter';
 
 export default function Header() {
   const { locationLabel, loading, granted, requestLocation } = useGeolocation();
@@ -57,10 +58,7 @@ export default function Header() {
               {granted ? locationLabel : 'Sua localização'}
             </span>
           </button>
-          <Link href="/notifications" aria-label="Ver notificações" className="relative p-2 hover:bg-gray-100 rounded-xl transition-colors">
-            <Bell className="w-5 h-5 text-gray-600" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-brand-pink rounded-full" />
-          </Link>
+          <NotificationCenter />
         </div>
       </div>
     </header>

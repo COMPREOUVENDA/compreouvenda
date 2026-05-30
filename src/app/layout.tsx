@@ -4,6 +4,7 @@ import { WebSiteJsonLd, OrganizationJsonLd } from '@/components/seo/JsonLd';
 import GeoProvider from '@/components/geo/GeoProvider';
 import CookieBanner from '@/components/cookies/CookieBanner';
 import SellButton from '@/components/ui/SellButton';
+import PushPermissionBanner from '@/components/notifications/PushPermissionBanner';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,6 +92,8 @@ export default function RootLayout({
         </GeoProvider>
         {/* Cookie banner fora do GeoProvider para não depender de geolocalização */}
         <CookieBanner />
+        {/* Push notification permission banner */}
+        <PushPermissionBanner />
         {/* Global FAB - Anunciar Agora (hidden on /product/new) */}
         <SellButton />
         <script
