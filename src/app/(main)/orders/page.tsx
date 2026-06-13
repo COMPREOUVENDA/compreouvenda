@@ -4,10 +4,9 @@ import { useState, useEffect } from 'react';
 import { ShoppingBag, Store, Package, Truck, CheckCircle, Clock, Loader2, Star } from 'lucide-react';
 import { useOrders } from '@/hooks/useOrders';
 import { useReviews } from '@/hooks/useReviews';
-import { MOCK_PRODUCTS } from '@/lib/constants';
 import { formatPrice, formatRelativeTime } from '@/lib/utils';
 import StarRating from '@/components/ui/StarRating';
-import type { Order, Product } from '@/types';
+import type { Order } from '@/types';
 
 const deliveryStatusConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   pending: { label: 'Aguardando', color: 'bg-amber-50 text-amber-600', icon: Clock },
@@ -76,9 +75,9 @@ interface OrderCardProps {
 }
 
 function OrderCard({ order, type, onConfirmDelivery, onReview }: OrderCardProps) {
-  const product = (MOCK_PRODUCTS as Product[]).find((p) => p.id === order.product_id);
-  const image = product?.images?.[0]?.url || product?.video_thumbnail || '';
-  const title = product?.title || 'Produto';
+  const prod = (order as any).product;
+  const image = prod?.images?.[0]?.url || '';
+  const title = prod?.title || 'Produto';
   const deliveryStatus = deliveryStatusConfig[order.delivery_status] || deliveryStatusConfig.pending;
   const paymentStatus = paymentStatusConfig[order.payment_status] || paymentStatusConfig.pending;
   const DeliveryIcon = deliveryStatus.icon;
@@ -167,7 +166,6 @@ export default function OrdersPage() {
 
   const handleReview = async (rating: number, comment: string) => {
     if (!reviewOrder) return;
-    const product = (MOCK_PRODUCTS as Product[]).find((p) => p.id === reviewOrder.product_id);
     await createReview({
       orderId: reviewOrder.id,
       reviewedId: reviewOrder.seller_id,

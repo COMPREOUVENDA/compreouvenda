@@ -43,9 +43,13 @@ const MOCK_NOTIFICATIONS = [
 ];
 
 export default function NotificationsPage() {
-  const { notifications, unreadCount, pushEnabled, enablePush, markAsRead, markAllRead } = useNotifications();
+  const { notifications, unreadCount, pushEnabled, enablePush, markAsRead, markAllRead, loadNotifications } = useNotifications();
 
-  const displayNotifs = notifications.length > 0 ? notifications : MOCK_NOTIFICATIONS;
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  const displayNotifs = notifications;
 
   const formatTime = (date: string) => {
     const diff = Date.now() - new Date(date).getTime();
