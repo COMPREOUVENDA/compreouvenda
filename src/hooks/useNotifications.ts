@@ -1,10 +1,20 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 
 const supabase = createClient();
+
+export interface NewMessageAlert {
+  id: string;
+  conversationId: string;
+  senderName: string;
+  senderAvatar?: string;
+  preview: string;
+  at: string;
+}
 
 interface Notification {
   id: string;
@@ -19,9 +29,14 @@ interface Notification {
 
 export function useNotifications() {
   const { user } = useAuthStore();
+  const pathname = usePathname();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [messageAlert, setMessageAlert] = useState<NewMessageAlert | null>(null);
+  const dismissTimer = useRef<NodeJS.Timeout | null>(null);
+  // Track which conversation IDs belong to this user
+  const convIdsRef = useRef<Set<string>>(new Set());
 
   // Load notifications — try notification_queue first, fall back to notifications table
   const loadNotifications = useCallback(async () => {
@@ -190,6 +205,108 @@ export function useNotifications() {
     setUnreadCount(0);
   }, [user]);
 
+  // Dismiss message alert helper
+  const dismissMessageAlert = useCallback(() => {
+    setMessageAlert(null);
+    if (dismissTimer.current) clearTimeout(dismissTimer.current);
+  }, []);
+
+  // Global real-time listener for new messages across all conversations
+  useEffect(() => {
+    if (!user) return;
+
+    // First, load user's conversation IDs
+    supabase
+      .from('conversations')
+      .select('id')
+      .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+      .then(({ data }) => {
+        if (data) {
+          convIdsRef.current = new Set(data.map((c: { id: string }) => c.id));
+        }
+      });
+
+    // Keep conversation IDs in sync
+    const convChannel = supabase
+      .channel(`user-convs:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'conversations', filter: `buyer_id=eq.${user.id}` },
+        (p) => { convIdsRef.current.add((p.new as { id: string }).id); }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'conversations', filter: `seller_id=eq.${user.id}` },
+        (p) => { convIdsRef.current.add((p.new as { id: string }).id); }
+      )
+      .subscribe();
+
+    // Listen for new messages globally
+    const msgChannel = supabase
+      .channel(`new-msgs:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        async (payload) => {
+          const msg = payload.new as {
+            id: string; conversation_id: string; sender_id: string; content: string; type: string; created_at: string;
+          };
+
+          // Skip own messages
+          if (msg.sender_id === user.id) return;
+          // Only care about conversations the user is part of
+          if (!convIdsRef.current.has(msg.conversation_id)) return;
+          // Skip if user is already viewing this conversation
+          if (pathname?.includes('/chat')) return;
+
+          // Fetch sender info
+          const { data: sender } = await supabase
+            .from('users')
+            .select('name, avatar_url')
+            .eq('id', msg.sender_id)
+            .single();
+
+          const preview = msg.type === 'image'
+            ? '📷 Imagem'
+            : msg.type === 'offer'
+            ? '💰 Proposta de valor'
+            : msg.content.slice(0, 80);
+
+          const alert: NewMessageAlert = {
+            id: msg.id,
+            conversationId: msg.conversation_id,
+            senderName: (sender as any)?.name || 'Alguém',
+            senderAvatar: (sender as any)?.avatar_url,
+            preview,
+            at: msg.created_at,
+          };
+
+          setMessageAlert(alert);
+
+          // Native browser notification
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            new window.Notification(`💬 ${alert.senderName}`, {
+              body: preview,
+              icon: '/icons/icon-192.png',
+              tag: `msg-${msg.conversation_id}`,
+              renotify: true,
+            });
+          }
+
+          // Auto-dismiss after 6s
+          if (dismissTimer.current) clearTimeout(dismissTimer.current);
+          dismissTimer.current = setTimeout(() => setMessageAlert(null), 6000);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(convChannel);
+      supabase.removeChannel(msgChannel);
+      if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    };
+  }, [user, pathname]);
+
   return {
     notifications,
     unreadCount,
@@ -198,5 +315,7 @@ export function useNotifications() {
     markAsRead,
     markAllRead,
     loadNotifications,
+    messageAlert,
+    dismissMessageAlert,
   };
 }

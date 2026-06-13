@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import Header from '@/components/layout/Header';
 import BottomNav from '@/components/layout/BottomNav';
+import NewMessageToast from '@/components/notifications/NewMessageToast';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,6 +12,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         {children}
       </main>
       <BottomNav />
+      <NewMessageToast />
     </div>
   );
 }
