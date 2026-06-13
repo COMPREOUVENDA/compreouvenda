@@ -1,11 +1,8 @@
-'use client';
-
-import { Metadata } from 'next';
-import Head from 'next/head';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
 
-const pageMetadata: Metadata = {
+export const metadata: Metadata = {
   title: 'Política de Privacidade - CompreOuVenda',
   description:
     'Leia a Política de Privacidade do CompreOuVenda. Entenda como coletamos, usamos, armazenamos e protegemos seus dados pessoais, em conformidade com a LGPD.',
@@ -47,36 +44,11 @@ const pageMetadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <>
-      <Head>
-        <title>Política de Privacidade - CompreOuVenda</title>
-        <meta
-          name="description"
-          content="Leia a Política de Privacidade do CompreOuVenda. Entenda como coletamos, usamos, armazenamos e protegemos seus dados pessoais, em conformidade com a LGPD."
-        />
-        <link rel="canonical" href="https://compreouvenda.vercel.app/privacidade" />
-        <meta property="og:title" content="Política de Privacidade - CompreOuVenda" />
-        <meta
-          property="og:description"
-          content="Política de Privacidade do CompreOuVenda em conformidade com a LGPD."
-        />
-        <meta property="og:url" content="https://compreouvenda.vercel.app/privacidade" />
-        <meta property="og:type" content="website" />
-        <meta property="og:locale" content="pt_BR" />
-        <meta property="og:site_name" content="CompreOuVenda" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Política de Privacidade - CompreOuVenda" />
-        <meta
-          name="twitter:description"
-          content="Política de Privacidade do CompreOuVenda em conformidade com a LGPD."
-        />
-      </Head>
-
-      <main
-        id="main-content"
-        className="min-h-screen"
-        style={{ backgroundColor: '#0D0B1F' }}
-      >
+    <main
+      id="main-content"
+      className="min-h-screen"
+      style={{ backgroundColor: '#0D0B1F' }}
+    >
         <div className="max-w-4xl mx-auto px-6 py-16 md:py-20">
           {/* Header */}
           <header className="mb-12">
@@ -651,7 +623,6 @@ export default function PrivacyPage() {
             </p>
           </footer>
         </div>
-      </main>
-    </>
+    </main>
   );
 }

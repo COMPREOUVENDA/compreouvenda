@@ -107,8 +107,38 @@ export default function NewProductPage() {
   const aiDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const marketDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState('');
+  const [locationLat, setLocationLat] = useState<number | null>(null);
+  const [locationLng, setLocationLng] = useState<number | null>(null);
+  const [locationCity, setLocationCity] = useState('');
+
   const { createProduct } = useProducts();
   const router = useRouter();
+
+  // Try to get geolocation on mount
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        setLocationLat(pos.coords.latitude);
+        setLocationLng(pos.coords.longitude);
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`
+          );
+          if (res.ok) {
+            const geo = await res.json();
+            const city = geo.address?.city || geo.address?.town || geo.address?.village || '';
+            setLocationCity(city);
+          }
+        } catch { /* ignore */ }
+        setLocationLoading(false);
+      },
+      () => { setLocationError('Localização não disponível'); setLocationLoading(false); }
+    );
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -181,11 +211,18 @@ export default function NewProductPage() {
     input.click();
   };
 
-  const addFiles = useCallback((files: File[]) => {
+  const MAX_IMAGE_SIZE_MB = 10;
+
+  const addFiles = useCallback((rawFiles: File[]) => {
+    const oversized = rawFiles.filter((f) => f.size > MAX_IMAGE_SIZE_MB * 1024 * 1024);
+    if (oversized.length > 0) {
+      showToast(`Arquivo muito grande. Máximo ${MAX_IMAGE_SIZE_MB}MB por imagem.`);
+    }
+    const validFiles = rawFiles.filter((f) => f.size <= MAX_IMAGE_SIZE_MB * 1024 * 1024);
     setPhotos((prev) => {
       const newPhotos = [...prev];
       const newPreviews = [...previews];
-      for (const file of files) {
+      for (const file of validFiles) {
         const slot = newPhotos.findIndex((p) => p === null);
         if (slot === -1) break;
         newPhotos[slot] = file;

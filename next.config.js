@@ -1,10 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  env: {
-    NEXT_PUBLIC_SUPABASE_URL: 'https://auxaajrjwbdsnxtvgmsb.supabase.co',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1eGFhanJqd2Jkc254dHZnbXNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNDIxMzMsImV4cCI6MjA5MjgxODEzM30.y7Sv6U7L0APrnQWBb5sKaFw8D-Vq13IiKs1uAP8MC8M',
-    NEXT_PUBLIC_VAPID_PUBLIC_KEY: 'BEL7ImHf5zuCYwtgDFmCTdWc-03ZOTFyhA1J4UBwNFfH3KUh8sbVB1BOFboB0E-yODjnjcUq0psrenoS6kC1YRc',
-  },
+  // ── IMPORTANT: Never hardcode secrets here. ──
+  // All keys are loaded from .env.local / Vercel Environment Variables.
+  // Required variables:
+  //   NEXT_PUBLIC_SUPABASE_URL
+  //   NEXT_PUBLIC_SUPABASE_ANON_KEY
+  //   NEXT_PUBLIC_VAPID_PUBLIC_KEY
+  //   VAPID_PRIVATE_KEY
+  //   VAPID_SUBJECT
+  //   SUPABASE_SERVICE_ROLE_KEY
+  //   CRON_SECRET
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -21,10 +26,12 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'images.unsplash.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'chart.googleapis.com',
+      },
     ],
   },
-  // Force all pages to be server-rendered (no static generation)
-  output: undefined,
   experimental: {
     missingSuspenseWithCSRBailout: false,
   },

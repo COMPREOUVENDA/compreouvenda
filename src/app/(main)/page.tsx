@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { Search, SlidersHorizontal, Sparkles } from 'lucide-react';
 import ProductCard from '@/components/product/ProductCard';
 import { ProductCardSkeleton } from '@/components/product/ProductCardSkeleton';
@@ -23,6 +24,16 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState<'feed' | 'grid'>('feed');
   const [searchQuery, setSearchQuery] = useState('');
   const { products, loading, fetchProducts, searchProducts } = useProducts();
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced search: 400ms after last keystroke
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      searchProducts(searchQuery, selectedCategory || undefined);
+    }, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [searchQuery, selectedCategory, searchProducts]);
 
   // Filter by category on client side (products already loaded)
   const filtered = useMemo(
@@ -107,9 +118,9 @@ export default function HomePage() {
               Envie 8 fotos e transforme em vídeo automático
             </p>
           </div>
-          <button className="bg-white text-brand-purple text-xs font-bold px-4 py-2 rounded-xl hover:bg-white/90 transition-colors">
+          <Link href="/product/new" className="bg-white text-brand-purple text-xs font-bold px-4 py-2 rounded-xl hover:bg-white/90 transition-colors">
             Criar
-          </button>
+          </Link>
         </div>
       </div>
 

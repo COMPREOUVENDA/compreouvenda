@@ -14,16 +14,7 @@ interface Stats {
   notifications: number;
 }
 
-const FALLBACK_STATS = [
-  { label: 'Usuários', value: '12.847', change: '+12%', up: true, icon: Users, color: 'bg-brand-purple/10 text-brand-purple' },
-  { label: 'Produtos Ativos', value: '4.231', change: '+8%', up: true, icon: Package, color: 'bg-brand-orange/10 text-brand-orange' },
-  { label: 'Receita Mensal', value: 'R$ 45.2K', change: '+23%', up: true, icon: DollarSign, color: 'bg-emerald-500/10 text-emerald-500' },
-  { label: 'Vídeos Gerados', value: '1.892', change: '+31%', up: true, icon: Video, color: 'bg-brand-blue/10 text-brand-blue' },
-  { label: 'Vendas do Mês', value: '856', change: '-3%', up: false, icon: ShoppingCart, color: 'bg-brand-pink/10 text-brand-pink' },
-  { label: 'Doações', value: 'R$ 8.4K', change: '+45%', up: true, icon: HandHeart, color: 'bg-emerald-500/10 text-emerald-500' },
-  { label: 'Leilões Ativos', value: '127', change: '+15%', up: true, icon: Gavel, color: 'bg-brand-gold/10 text-brand-gold' },
-  { label: 'Ofertas Flash', value: '89', change: '+22%', up: true, icon: Zap, color: 'bg-brand-pink/10 text-brand-pink' },
-];
+
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -77,7 +68,7 @@ export default function AdminDashboard() {
     { label: 'Vídeos IA', value: stats.videoJobs.toLocaleString('pt-BR'), change: 'real', up: true, icon: Video, color: 'bg-brand-blue/10 text-brand-blue' },
   ] : [];
 
-  const displayStats = stats && stats.users > 0 ? realStats : FALLBACK_STATS;
+  const displayStats = realStats;
 
   return (
     <div className="space-y-6">

@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import {
   ArrowLeft, Heart, Share2, MapPin, MessageCircle, Eye, Star, Users,
   HandHeart, Play, ChevronLeft, ChevronRight, Gavel, Zap, Clock,
-  ShieldCheck, Loader2,
+  ShieldCheck, Loader2, ShoppingCart,
 } from 'lucide-react';
 import { formatPrice, formatDistance, conditionLabels, formatRelativeTime } from '@/lib/utils';
 import ProductCard from '@/components/product/ProductCard';
@@ -18,7 +18,8 @@ import StarRating from '@/components/ui/StarRating';
 import { useProducts } from '@/hooks/useProducts';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useReviews } from '@/hooks/useReviews';
-import { MOCK_PRODUCTS } from '@/lib/constants';
+import { useAuthStore } from '@/stores/authStore';
+import { createClient } from '@/lib/supabase/client';
 import type { Product } from '@/types';
 
 const AdBannerCarousel = dynamic(() => import('@/components/ads/AdBannerCarousel'), {
@@ -71,10 +72,13 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [flashExpired, setFlashExpired] = useState(false);
   const [auctionBid, setAuctionBid] = useState<number | null>(null);
+  const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
+  const [sellerRating, setSellerRating] = useState<number | null>(null);
 
-  const { getProduct, products: allProducts } = useProducts();
+  const { getProduct } = useProducts();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { reviews, getProductReviews, createReview } = useReviews();
+  const { user } = useAuthStore();
   const searchParams = useSearchParams();
   const refUserId = searchParams.get('ref');
 
@@ -99,9 +103,35 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   useEffect(() => {
     if (product) {
       getProductReviews(product.id);
-      // Set flash expired based on end date
       if (product.flash_offer_end_at) {
         setFlashExpired(new Date(product.flash_offer_end_at) <= new Date());
+      }
+
+      // Fetch similar products from Supabase
+      const supabase = createClient();
+      supabase
+        .from('products')
+        .select('*, images:product_images(id, url, position, label), user:users!products_user_id_fkey(id, name, city, state)')
+        .eq('category_id', product.category_id)
+        .eq('status', 'active')
+        .neq('id', product.id)
+        .limit(4)
+        .then(({ data }) => {
+          if (data && data.length > 0) setSimilarProducts(data as Product[]);
+        });
+
+      // Fetch seller rating from reviews
+      if (product.user_id) {
+        supabase
+          .from('reviews')
+          .select('rating')
+          .eq('reviewed_id', product.user_id)
+          .then(({ data }) => {
+            if (data && data.length > 0) {
+              const avg = data.reduce((s: number, r: any) => s + r.rating, 0) / data.length;
+              setSellerRating(avg);
+            }
+          });
       }
     }
   }, [product, getProductReviews]);
@@ -152,9 +182,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   }
 
   const images = product.images || [];
-  const similarProducts = (MOCK_PRODUCTS as Product[])
-    .filter((p) => p.category_id === product.category_id && p.id !== product.id)
-    .slice(0, 4);
 
   const isFlashActive = product.flash_offer_enabled
     && product.flash_offer_status === 'active'
@@ -357,14 +384,14 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                     ? formatDistance(product.distance_km)
                     : product.city}
                   <span className="mx-1">·</span>
-                  {avgRating !== null ? (
+                  {(sellerRating !== null || avgRating !== null) ? (
                     <>
                       <Star className="w-3 h-3 fill-brand-gold text-brand-gold" />
-                      {avgRating.toFixed(1)}
+                      {(sellerRating ?? avgRating!).toFixed(1)}
                     </>
                   ) : (
                     <>
-                      <Star className="w-3 h-3 fill-brand-gold text-brand-gold" /> 4.8
+                      <Star className="w-3 h-3 fill-brand-gold text-brand-gold" /> Novo
                     </>
                   )}
                 </div>
@@ -399,24 +426,33 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
           {/* Actions */}
           <div className="flex gap-3">
-            <button
-              disabled={flashExpired && product.flash_offer_enabled && !product.auction_enabled}
-              className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
+            <Link
+              href={`/chat?productId=${product.id}&sellerId=${product.user_id}`}
+              className="btn-secondary flex-1 flex items-center justify-center gap-2"
             >
               <MessageCircle className="w-5 h-5" /> Falar com vendedor
-            </button>
-            {product.allow_resale_by_others && (
-              <button
-                onClick={() => {
-                  const shareUrl = `${window.location.origin}/product/${product.id}?ref=${sessionStorage.getItem('ref_reseller_id') || 'me'}`;
-                  navigator.clipboard.writeText(shareUrl);
-                }}
-                className="btn-secondary flex items-center justify-center gap-2 px-4"
-              >
-                <Users className="w-5 h-5" /> Vender
-              </button>
-            )}
+            </Link>
+            <Link
+              href={`/checkout?productId=${product.id}`}
+              className={`btn-primary flex-1 flex items-center justify-center gap-2 ${
+                (flashExpired && product.flash_offer_enabled && !product.auction_enabled) ? 'opacity-50 pointer-events-none' : ''
+              }`}
+            >
+              <ShoppingCart className="w-5 h-5" /> Comprar agora
+            </Link>
           </div>
+          {product.allow_resale_by_others && (
+            <button
+              onClick={() => {
+                const myRef = user?.id || 'me';
+                const shareUrl = `${window.location.origin}/product/${product.id}?ref=${myRef}`;
+                navigator.clipboard.writeText(shareUrl);
+              }}
+              className="btn-secondary w-full flex items-center justify-center gap-2"
+            >
+              <Users className="w-5 h-5" /> Copiar link de afiliado ({product.reseller_commission_value}% comissão)
+            </button>
+          )}
 
           {/* Auction section */}
           {product.auction_enabled && product.auction_status === 'open' && (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import type { Order } from '@/types';
@@ -53,8 +53,47 @@ export function useOrders() {
   const [sales, setSales] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const realtimeRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  const getMyOrders = useCallback(async () => {
+  // Realtime subscription for orders updates
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`orders:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders', filter: `buyer_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setOrders((prev) => [payload.new as Order, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setOrders((prev) =>
+              prev.map((o) => (o.id === (payload.new as Order).id ? (payload.new as Order) : o))
+            );
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders', filter: `seller_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setSales((prev) => [payload.new as Order, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setSales((prev) =>
+              prev.map((o) => (o.id === (payload.new as Order).id ? (payload.new as Order) : o))
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    realtimeRef.current = channel;
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  const getMyOrders = useCallback(async (): Promise<Order[]> => {
     if (!user) {
       setOrders(MOCK_ORDERS);
       return MOCK_ORDERS;
@@ -63,7 +102,7 @@ export function useOrders() {
     try {
       const { data, error: fetchError } = await supabase
         .from('orders')
-        .select('*')
+        .select('*, product:products(id, title, price, images:product_images(url))')
         .eq('buyer_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -81,7 +120,7 @@ export function useOrders() {
     }
   }, [user]);
 
-  const getMySales = useCallback(async () => {
+  const getMySales = useCallback(async (): Promise<Order[]> => {
     if (!user) {
       setSales([]);
       return [];
@@ -90,7 +129,7 @@ export function useOrders() {
     try {
       const { data, error: fetchError } = await supabase
         .from('orders')
-        .select('*')
+        .select('*, product:products(id, title, price, images:product_images(url))')
         .eq('seller_id', user.id)
         .order('created_at', { ascending: false });
 

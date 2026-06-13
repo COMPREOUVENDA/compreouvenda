@@ -1,11 +1,8 @@
-'use client';
-
-import { Metadata } from 'next';
-import Head from 'next/head';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
 
-const pageMetadata: Metadata = {
+export const metadata: Metadata = {
   title: 'Termos de Uso - CompreOuVenda',
   description:
     'Leia os Termos de Uso do CompreOuVenda. Conheça as regras de cadastro, anúncios, transações, doações e conduta na plataforma de marketplace C2C.',
@@ -49,35 +46,10 @@ const pageMetadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <>
-      <Head>
-        <title>Termos de Uso - CompreOuVenda</title>
-        <meta
-          name="description"
-          content="Leia os Termos de Uso do CompreOuVenda. Conheça as regras de cadastro, anúncios, transações, doações e conduta na plataforma de marketplace C2C."
-        />
-        <link rel="canonical" href="https://compreouvenda.vercel.app/terms" />
-        <meta property="og:title" content="Termos de Uso - CompreOuVenda" />
-        <meta
-          property="og:description"
-          content="Conheça os Termos de Uso do marketplace CompreOuVenda: cadastro, anúncios, transações e doações."
-        />
-        <meta property="og:url" content="https://compreouvenda.vercel.app/terms" />
-        <meta property="og:type" content="website" />
-        <meta property="og:locale" content="pt_BR" />
-        <meta property="og:site_name" content="CompreOuVenda" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Termos de Uso - CompreOuVenda" />
-        <meta
-          name="twitter:description"
-          content="Conheça os Termos de Uso do marketplace CompreOuVenda: cadastro, anúncios, transações e doações."
-        />
-      </Head>
-
-      <main
-        id="main-content"
-        className="min-h-screen"
-        style={{ backgroundColor: '#0D0B1F' }}
+    <main
+      id="main-content"
+      className="min-h-screen"
+      style={{ backgroundColor: '#0D0B1F' }}
       >
         <div className="max-w-4xl mx-auto px-6 py-16 md:py-20">
           {/* Header */}
@@ -603,7 +575,6 @@ export default function TermsPage() {
             </p>
           </footer>
         </div>
-      </main>
-    </>
+    </main>
   );
 }

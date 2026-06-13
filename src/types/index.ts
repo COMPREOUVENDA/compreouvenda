@@ -1,14 +1,21 @@
 export interface User {
   id: string;
+  auth_id?: string;
   email: string;
   name: string;
   avatar_url?: string;
   type: 'buyer' | 'seller' | 'charity';
+  role?: 'user' | 'admin' | 'super_admin';
   phone?: string;
   location_lat?: number;
   location_lng?: number;
   city?: string;
   state?: string;
+  seller_type?: 'individual' | 'company';
+  donation_percent?: number;
+  rating?: number;
+  rating_count?: number;
+  bio?: string;
   created_at: string;
   is_pro: boolean;
 }
@@ -116,7 +123,9 @@ export interface Message {
   content: string;
   type: 'text' | 'proposal' | 'image';
   proposal_value?: number;
+  read?: boolean;
   created_at: string;
+  sender?: User;
 }
 
 export interface Order {
@@ -141,6 +150,10 @@ export interface Order {
   seller_confirmed: boolean;
   delivery_confirmed_at?: string;
   created_at: string;
+  updated_at?: string;
+  product?: Product;
+  buyer?: User;
+  seller?: User;
 }
 
 export interface Charity {
@@ -158,8 +171,10 @@ export interface Notification {
   user_id: string;
   title: string;
   body: string;
-  type: string;
+  type: 'new_order' | 'new_message' | 'price_alert' | 'product_sold' | 'review_received' | 'payment_received' | 'promotion' | 'system' | string;
   read: boolean;
+  url?: string;
+  image?: string;
   data?: Record<string, unknown>;
   created_at: string;
 }

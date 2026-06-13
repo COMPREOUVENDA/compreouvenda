@@ -267,7 +267,7 @@ export default function DashboardPage() {
   const [userListings, setUserListings] = useState<Product[]>([]);
   const [soldListings, setSoldListings] = useState<Product[]>([]);
   const [commissions, setCommissions] = useState<Order[]>([]);
-  const [userRating] = useState({ average: 4.9, count: 47 });
+  const [userRating, setUserRating] = useState({ average: 0, count: 0 });
   const [loadingListings, setLoadingListings] = useState(false);
 
   const { user } = useAuthStore();
@@ -279,7 +279,7 @@ export default function DashboardPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Profile initial data
+  // Profile initial data + load seller_type/donation_percent + real rating
   useEffect(() => {
     if (user) {
       setSettingsForm({
@@ -288,10 +288,23 @@ export default function DashboardPage() {
         city: user.city || '',
         state: user.state || '',
       });
-      // Check if account is pending deletion
+      if ((user as any).seller_type === 'individual') setSellerMode('owner');
+      else if ((user as any).seller_type === 'company') setSellerMode('commissioned');
+      if ((user as any).donation_percent !== undefined) setDonationPercent((user as any).donation_percent);
       if ((user as unknown as { status?: string }).status === 'pending_deletion') {
         setShowDeletionBanner(true);
       }
+      // Load real rating from Supabase
+      supabase
+        .from('reviews')
+        .select('rating')
+        .eq('reviewed_id', user.id)
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            const avg = data.reduce((s: number, r: any) => s + r.rating, 0) / data.length;
+            setUserRating({ average: avg, count: data.length });
+          }
+        });
     }
   }, [user]);
 
@@ -472,6 +485,8 @@ export default function DashboardPage() {
           phone: settingsForm.phone,
           city: settingsForm.city,
           state: settingsForm.state,
+          seller_type: sellerMode === 'owner' ? 'individual' : sellerMode === 'commissioned' ? 'company' : undefined,
+          donation_percent: donationPercent,
         })
         .eq('id', user.id);
       setSettingsSaved(true);

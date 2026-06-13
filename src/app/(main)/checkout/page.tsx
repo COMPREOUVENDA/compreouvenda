@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, CreditCard, QrCode, Shield, MapPin, Truck, Package, ChevronRight, Lock, CheckCircle, Users, HandHeart, Loader2, Copy, AlertCircle } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
 import { createPayment, calculateSplit } from '@/lib/payments';
 import { useAuthStore } from '@/stores/authStore';
+import { createClient } from '@/lib/supabase/client';
 
 export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit'>('pix');
@@ -18,12 +19,52 @@ export default function CheckoutPage() {
   const [installments, setInstallments] = useState(1);
   const [cardData, setCardData] = useState({ number: '', expMonth: '', expYear: '', cvv: '', holderName: '', cpf: '' });
   const [copied, setCopied] = useState(false);
+  const [product, setProduct] = useState<{ id: string; title: string; price: number; sellerId: string; seller: string; image: string } | null>(null);
+  const [productLoading, setProductLoading] = useState(true);
 
   const { user } = useAuthStore();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  // Mock order data (in production, this comes from route params/state)
-  const product = { id: 'prod-1', title: 'iPhone 14 Pro Max 256GB', price: 5200, sellerId: 'seller-1', seller: 'Maria Santos', image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=200' };
+  // Load product from searchParams productId
+  useEffect(() => {
+    const productId = searchParams.get('productId');
+    if (!productId) {
+      // Fallback: demo product
+      setProduct({ id: 'prod-1', title: 'iPhone 14 Pro Max 256GB', price: 5200, sellerId: 'seller-1', seller: 'Maria Santos', image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=200' });
+      setProductLoading(false);
+      return;
+    }
+    const supabase = createClient();
+    supabase
+      .from('products')
+      .select('id, title, price, user_id, user:users!products_user_id_fkey(name), images:product_images(url)')
+      .eq('id', productId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setProduct({
+            id: data.id,
+            title: data.title,
+            price: data.price,
+            sellerId: data.user_id,
+            seller: (data.user as any)?.name || 'Vendedor',
+            image: (data.images as any[])?.[0]?.url || '',
+          });
+        } else {
+          setProduct({ id: 'prod-1', title: 'iPhone 14 Pro Max 256GB', price: 5200, sellerId: 'seller-1', seller: 'Maria Santos', image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=200' });
+        }
+        setProductLoading(false);
+      });
+  }, [searchParams]);
+
+  if (productLoading || !product) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 text-brand-purple animate-spin" />
+      </div>
+    );
+  }
 
   const gatewayFeePercent = paymentMethod === 'pix' ? 1.5 : 3.5;
   const split = calculateSplit(product.price, {
