@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, SlidersHorizontal, X, LayoutGrid, List, ChevronDown } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { CATEGORIES, MOCK_PRODUCTS } from '@/lib/constants';
+import { CATEGORIES } from '@/lib/constants';
 import { formatPrice, conditionLabels } from '@/lib/utils';
 import ProductCard from '@/components/product/ProductCard';
 import type { Product } from '@/types';
@@ -96,32 +96,13 @@ export default function SearchPage() {
 
       const { data, error } = await dbQuery.limit(60);
 
-      if (error || !data || data.length === 0) {
-        // Fallback: filter mocks
-        let result = MOCK_PRODUCTS as Product[];
-        if (q) {
-          result = result.filter(
-            (p) =>
-              p.title.toLowerCase().includes(q.toLowerCase()) ||
-              p.description.toLowerCase().includes(q.toLowerCase())
-          );
-        }
-        if (f.category) result = result.filter((p) => p.category_id === f.category);
-        if (f.priceMin) result = result.filter((p) => p.price >= parseFloat(f.priceMin));
-        if (f.priceMax) result = result.filter((p) => p.price <= parseFloat(f.priceMax));
-        if (f.conditions.length > 0) result = result.filter((p) => f.conditions.includes(p.condition));
-
-        if (f.sort === 'price_asc') result = [...result].sort((a, b) => a.price - b.price);
-        else if (f.sort === 'price_desc') result = [...result].sort((a, b) => b.price - a.price);
-        else if (f.sort === 'views_desc') result = [...result].sort((a, b) => b.views_count - a.views_count);
-        else result = [...result].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-        setProducts(result);
+      if (error || !data) {
+        setProducts([]);
       } else {
         setProducts(data as Product[]);
       }
     } catch {
-      setProducts(MOCK_PRODUCTS as Product[]);
+      setProducts([]);
     } finally {
       setLoading(false);
     }

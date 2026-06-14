@@ -94,6 +94,8 @@ export default function NewProductPage() {
   // AI Pricing state
   const [priceSuggestion, setPriceSuggestion] = useState<PriceSuggestion | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiTitleLoading, setAiTitleLoading] = useState(false);
+  const [aiDescLoading, setAiDescLoading] = useState(false);
   const [marketData, setMarketData] = useState<{
     avg_price: number;
     min_price: number;
@@ -146,6 +148,70 @@ export default function NewProductPage() {
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3500);
+  };
+
+  const generateTitleWithAI = async () => {
+    setAiTitleLoading(true);
+    try {
+      const res = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'title', hint: title, category: categoryId, condition }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.result) {
+          setTitle(json.result);
+          showToast('Título gerado pela IA!');
+        }
+      }
+    } catch { showToast('Erro ao gerar título'); }
+    finally { setAiTitleLoading(false); }
+  };
+
+  const generateDescriptionWithAI = async () => {
+    setAiDescLoading(true);
+    try {
+      const res = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'description', hint: title, category: categoryId, condition, price: parseFloat(price) || 0 }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.result) {
+          setDescription(json.result);
+          showToast('Descrição gerada pela IA!');
+        }
+      }
+    } catch { showToast('Erro ao gerar descrição'); }
+    finally { setAiDescLoading(false); }
+  };
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) { showToast('Geolocalização não suportada'); return; }
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        setLocationLat(pos.coords.latitude);
+        setLocationLng(pos.coords.longitude);
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`
+          );
+          if (res.ok) {
+            const geo = await res.json();
+            const city = geo.address?.city || geo.address?.town || geo.address?.village || '';
+            const state = geo.address?.state_code || geo.address?.state || '';
+            setLocationCity(city);
+            setLocationState(state.length <= 2 ? state.toUpperCase() : state.slice(0, 2).toUpperCase());
+            showToast(`Localização definida: ${city}`);
+          }
+        } catch { /* ignore */ }
+        setLocationLoading(false);
+      },
+      () => { setLocationError('Localização não disponível'); setLocationLoading(false); }
+    );
   };
 
   // Fetch market data when category changes
@@ -472,11 +538,12 @@ export default function NewProductPage() {
                   maxLength={120}
                 />
                 <button
-                  onClick={() => showToast('Em breve: IA gerará o título automaticamente')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-brand-purple/10 hover:bg-brand-purple/20 text-brand-purple text-[10px] font-bold px-2.5 py-1.5 rounded-xl transition-colors"
+                  onClick={generateTitleWithAI}
+                  disabled={aiTitleLoading}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-brand-purple/10 hover:bg-brand-purple/20 text-brand-purple text-[10px] font-bold px-2.5 py-1.5 rounded-xl transition-colors disabled:opacity-60"
                   aria-label="Gerar título com IA"
                 >
-                  <Wand2 className="w-3 h-3" />
+                  {aiTitleLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
                   IA
                 </button>
               </div>
@@ -561,11 +628,12 @@ export default function NewProductPage() {
                   maxLength={2000}
                 />
                 <button
-                  onClick={() => showToast('Em breve: descrição automática gerada por IA')}
-                  className="absolute bottom-3 right-3 flex items-center gap-1 bg-brand-blue/10 hover:bg-brand-blue/20 text-brand-blue text-[10px] font-bold px-2.5 py-1.5 rounded-xl transition-colors"
+                  onClick={generateDescriptionWithAI}
+                  disabled={aiDescLoading}
+                  className="absolute bottom-3 right-3 flex items-center gap-1 bg-brand-blue/10 hover:bg-brand-blue/20 text-brand-blue text-[10px] font-bold px-2.5 py-1.5 rounded-xl transition-colors disabled:opacity-60"
                   aria-label="Gerar descrição com IA"
                 >
-                  <FileText className="w-3 h-3" />
+                  {aiDescLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
                   Gerar com IA
                 </button>
               </div>
@@ -603,20 +671,19 @@ export default function NewProductPage() {
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { label: 'Gerar título', icon: Wand2, toast: 'Em breve: IA gerará o título automaticamente' },
-                  { label: 'Sugerir preço', icon: DollarSign, toast: title && categoryId ? '' : 'Preencha título e categoria primeiro' },
-                  { label: 'Gerar descrição', icon: FileText, toast: 'Em breve: descrição automática por IA' },
-                ].map(({ label, icon: Icon, toast: t }) => (
+                  { label: 'Gerar título', icon: Wand2, action: generateTitleWithAI, loading: aiTitleLoading },
+                  { label: 'Sugerir preço', icon: DollarSign, action: () => { if (priceSuggestion) { setPrice(priceSuggestion.suggested_price.toString()); showToast(`Preço sugerido: R$ ${priceSuggestion.suggested_price}`); } else { showToast('Preencha título e categoria primeiro'); } }, loading: false },
+                  { label: 'Gerar descrição', icon: FileText, action: generateDescriptionWithAI, loading: aiDescLoading },
+                ].map(({ label, icon: Icon, action, loading: btnLoading }) => (
                   <button
                     key={label}
-                    onClick={() => t && showToast(t)}
-                    className="flex flex-col items-center gap-1.5 p-2.5 bg-white rounded-xl border border-brand-purple/10 hover:border-brand-purple/30 hover:bg-brand-purple/5 transition-all text-center"
+                    onClick={action}
+                    disabled={btnLoading}
+                    className="flex flex-col items-center gap-1.5 p-2.5 bg-white rounded-xl border border-brand-purple/10 hover:border-brand-purple/30 hover:bg-brand-purple/5 transition-all text-center disabled:opacity-60"
                   >
-                    <Icon className="w-4 h-4 text-brand-purple" />
+                    {btnLoading ? <Loader2 className="w-4 h-4 text-brand-purple animate-spin" /> : <Icon className="w-4 h-4 text-brand-purple" />}
                     <span className="text-[10px] text-gray-600 font-medium leading-tight">{label}</span>
-                    <span className="text-[9px] text-brand-orange font-bold">
-                      {label === 'Sugerir preço' ? 'Automático' : 'Em breve'}
-                    </span>
+                    <span className="text-[9px] text-brand-orange font-bold">IA</span>
                   </button>
                 ))}
               </div>
@@ -660,9 +727,12 @@ export default function NewProductPage() {
               </label>
               <button
                 type="button"
-                className="w-full flex items-center justify-center gap-2 py-3 bg-brand-blue/10 rounded-2xl text-brand-blue text-sm font-medium hover:bg-brand-blue/20 transition-colors"
+                onClick={requestLocation}
+                disabled={locationLoading}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-brand-blue/10 rounded-2xl text-brand-blue text-sm font-medium hover:bg-brand-blue/20 transition-colors disabled:opacity-60"
               >
-                <MapPin className="w-4 h-4" /> Usar minha localização atual
+                {locationLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+                {locationCity ? `📍 ${locationCity}${locationState ? ` – ${locationState}` : ''}` : 'Usar minha localização atual'}
               </button>
             </div>
 
