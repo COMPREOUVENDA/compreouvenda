@@ -179,7 +179,7 @@ export function useChat() {
   // Typing broadcast
   const broadcastTyping = () => {
     if (!channelRef.current || !user) return;
-    channelRef.current.send({ type: 'broadcast', event: 'typing', payload: { userId: user.id, name: user.user_metadata?.name || 'Usuário' } });
+    channelRef.current.send({ type: 'broadcast', event: 'typing', payload: { userId: user.id, name: user.name || 'Usuário' } });
   };
 
   return {

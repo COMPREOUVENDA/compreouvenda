@@ -36,10 +36,12 @@ export default function ReviewList({ sellerId, productId }: { sellerId?: string;
 
   const handleHelpful = async (reviewId: string) => {
     const supabase = createClient();
-    await supabase.rpc('increment_helpful', { review_id: reviewId }).catch(() => {
+    try {
+      await supabase.rpc('increment_helpful', { review_id: reviewId });
+    } catch {
       // Fallback: direct update
       supabase.from('reviews').update({ helpful_count: reviews.find(r => r.id === reviewId)!.helpful_count + 1 }).eq('id', reviewId);
-    });
+    }
     setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, helpful_count: r.helpful_count + 1 } : r));
   };
 

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Profile {
   id: string;
@@ -22,7 +23,8 @@ interface Profile {
 }
 
 export default function SettingsPage() {
-  const { user, signOut } = useAuthStore();
+  const { user } = useAuthStore();
+  const { signOut } = useAuth();
   const router = useRouter();
   const supabase = createClient();
   const fileRef = useRef<HTMLInputElement>(null);

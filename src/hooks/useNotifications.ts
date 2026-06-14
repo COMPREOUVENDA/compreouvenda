@@ -290,7 +290,7 @@ export function useNotifications() {
               icon: '/icons/icon-192.png',
               tag: `msg-${msg.conversation_id}`,
               renotify: true,
-            });
+            } as NotificationOptions & { renotify: boolean });
           }
 
           // Auto-dismiss after 6s

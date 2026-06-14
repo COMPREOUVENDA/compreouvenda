@@ -140,6 +140,7 @@ export interface Order {
   reseller_commission_value: number;
   donation_value: number;
   seller_net_value: number;
+  net_value?: number;
   payment_status: 'pending' | 'paid' | 'held' | 'released' | 'refunded' | 'disputed' | 'failed';
   payment_provider?: string;
   transaction_id?: string;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import type React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -186,6 +187,16 @@ export default function NewProductPage() {
       }
     } catch { showToast('Erro ao gerar descrição'); }
     finally { setAiDescLoading(false); }
+  };
+
+  const applySuggestedPrice = () => {
+    const ps = priceSuggestion;
+    if (ps) {
+      setPrice(ps.suggested_price.toString());
+      showToast(`Preço sugerido: R$ ${ps.suggested_price}`);
+    } else {
+      showToast('Preencha título e categoria primeiro');
+    }
   };
 
   const requestLocation = () => {
@@ -670,11 +681,11 @@ export default function NewProductPage() {
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                {[
+                {([
                   { label: 'Gerar título', icon: Wand2, action: generateTitleWithAI, loading: aiTitleLoading },
-                  { label: 'Sugerir preço', icon: DollarSign, action: () => { if (priceSuggestion) { setPrice(priceSuggestion.suggested_price.toString()); showToast(`Preço sugerido: R$ ${priceSuggestion.suggested_price}`); } else { showToast('Preencha título e categoria primeiro'); } }, loading: false },
+                  { label: 'Sugerir preço', icon: DollarSign, action: applySuggestedPrice, loading: false as boolean },
                   { label: 'Gerar descrição', icon: FileText, action: generateDescriptionWithAI, loading: aiDescLoading },
-                ].map(({ label, icon: Icon, action, loading: btnLoading }) => (
+                ] as { label: string; icon: React.ElementType; action: () => void; loading: boolean }[]).map(({ label, icon: Icon, action, loading: btnLoading }) => (
                   <button
                     key={label}
                     onClick={action}
