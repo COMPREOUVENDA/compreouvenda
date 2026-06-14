@@ -5,8 +5,9 @@ import {
   Package, ShoppingBag, Heart, Video, Users, HandHeart, TrendingUp,
   Settings, Bell, Store, UserCheck, Percent, Loader2,
   CheckCircle, Save, Trash2, Download, AlertTriangle, X, Shield,
-  FileText, Mail, ToggleLeft, ToggleRight, Lock,
+  FileText, Mail, ToggleLeft, ToggleRight, Lock, Pencil,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
@@ -313,7 +314,7 @@ export default function DashboardPage() {
       setLoadingListings(true);
       try {
         if (!user) {
-          setUserListings((MOCK_PRODUCTS as Product[]).slice(0, 4));
+          setUserListings([]);
           setSoldListings([]);
           return;
         }
@@ -323,13 +324,8 @@ export default function DashboardPage() {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 
-        if (!data || data.length === 0) {
-          setUserListings((MOCK_PRODUCTS as Product[]).slice(0, 4));
-          setSoldListings([]);
-        } else {
-          setUserListings((data as Product[]).filter((p) => p.status !== 'sold'));
-          setSoldListings((data as Product[]).filter((p) => p.status === 'sold'));
-        }
+        setUserListings((data as Product[] || []).filter((p) => p.status !== 'sold'));
+        setSoldListings((data as Product[] || []).filter((p) => p.status === 'sold'));
       } finally {
         setLoadingListings(false);
       }
@@ -619,9 +615,9 @@ export default function DashboardPage() {
     { label: 'Anúncios', value: String(userListings.length), color: 'bg-brand-purple/10 text-brand-purple' },
     { label: 'Vendas', value: String(sales.length || soldListings.length), color: 'bg-brand-orange/10 text-brand-orange' },
     {
-      label: 'Comissões',
-      value: formatPrice(commissions.reduce((s, o) => s + o.reseller_commission_value, 0)),
-      color: 'bg-brand-blue/10 text-brand-blue',
+      label: 'Receita',
+      value: formatPrice(sales.reduce((s, o) => s + (o.net_value || o.gross_value || 0), 0)),
+      color: 'bg-emerald-50 text-emerald-600',
     },
     {
       label: 'Doações',
@@ -759,6 +755,13 @@ export default function DashboardPage() {
             <Bell className="w-5 h-5 text-gray-500" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-brand-pink rounded-full" />
           </button>
+          <Link
+            href="/settings"
+            className="flex items-center gap-1.5 px-3 py-2 bg-brand-purple/10 text-brand-purple rounded-xl text-xs font-semibold hover:bg-brand-purple/20 transition-colors"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Editar Perfil
+          </Link>
         </div>
 
         {/* Stats */}
