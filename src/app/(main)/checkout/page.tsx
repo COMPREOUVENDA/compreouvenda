@@ -30,9 +30,8 @@ export default function CheckoutPage() {
   useEffect(() => {
     const productId = searchParams.get('productId');
     if (!productId) {
-      // Fallback: demo product
-      setProduct({ id: 'prod-1', title: 'iPhone 14 Pro Max 256GB', price: 5200, sellerId: 'seller-1', seller: 'Maria Santos', image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=200' });
-      setProductLoading(false);
+      // Sem produto — redireciona para home
+      router.replace('/');
       return;
     }
     const supabase = createClient();
