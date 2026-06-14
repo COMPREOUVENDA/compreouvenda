@@ -96,6 +96,14 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       const data = await getProduct(params.id);
       setProduct(data);
       setLoadingProduct(false);
+
+      // Incrementar contador de visualizações de forma assíncrona
+      const supabase = createClient();
+      supabase
+        .from('products')
+        .update({ views_count: (data?.views_count || 0) + 1 })
+        .eq('id', params.id)
+        .then(() => {});
     };
     load();
   }, [params.id, getProduct]);

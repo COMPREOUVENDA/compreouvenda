@@ -18,7 +18,6 @@ import ProductCard from '@/components/product/ProductCard';
 import StarRating from '@/components/ui/StarRating';
 import FirstSellCTA from '@/components/onboarding/FirstSellCTA';
 import type { Product, Order } from '@/types';
-import { MOCK_PRODUCTS } from '@/lib/constants';
 import { logAudit } from '@/lib/audit';
 
 const supabase = createClient();
@@ -86,8 +85,8 @@ const DEFAULT_CONSENTS: UserConsent[] = [
 ];
 
 function OrderMiniCard({ order }: { order: Order }) {
-  const product = (MOCK_PRODUCTS as Product[]).find((p) => p.id === order.product_id);
-  const image = product?.images?.[0]?.url || '';
+  const prod = (order as any).product;
+  const image = prod?.images?.[0]?.url || '';
 
   const statusColors: Record<string, string> = {
     pending: 'bg-amber-50 text-amber-600',
@@ -110,7 +109,7 @@ function OrderMiniCard({ order }: { order: Order }) {
       />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-gray-900 truncate">
-          {product?.title || 'Produto'}
+          {prod?.title || 'Produto'}
         </p>
         <p className="text-xs text-gray-400">{formatRelativeTime(order.created_at)}</p>
       </div>
@@ -932,11 +931,11 @@ export default function DashboardPage() {
               </div>
             ) : (
               commissions.map((order) => {
-                const product = (MOCK_PRODUCTS as Product[]).find((p) => p.id === order.product_id);
+                const prod = (order as any).product;
                 return (
                   <div key={order.id} className="flex items-center justify-between py-3 border-t border-gray-100">
                     <div>
-                      <span className="font-medium text-sm text-gray-900">{product?.title || 'Produto'}</span>
+                      <span className="font-medium text-sm text-gray-900">{prod?.title || 'Produto'}</span>
                       <span className="block text-xs text-gray-400">
                         Comissão: {formatPrice(order.reseller_commission_value)}
                       </span>
@@ -973,13 +972,13 @@ export default function DashboardPage() {
             </div>
           ) : (
             [...orders, ...sales].filter((o) => o.donation_value > 0).map((order) => {
-              const product = (MOCK_PRODUCTS as Product[]).find((p) => p.id === order.product_id);
+              const prod = (order as any).product;
               return (
                 <div key={order.id} className="flex items-center justify-between py-3 border-t border-gray-100">
                   <div>
                     <span className="font-medium text-sm text-gray-900">Instituição</span>
                     <span className="block text-xs text-gray-400">
-                      Venda: {product?.title || 'Produto'} · {formatRelativeTime(order.created_at)}
+                      Venda: {prod?.title || 'Produto'} · {formatRelativeTime(order.created_at)}
                     </span>
                   </div>
                   <span className="font-display font-bold text-emerald-600">
