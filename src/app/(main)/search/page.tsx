@@ -5,6 +5,7 @@ import { Search, SlidersHorizontal, X, LayoutGrid, List, ChevronDown } from 'luc
 import { createClient } from '@/lib/supabase/client';
 import { CATEGORIES } from '@/lib/constants';
 import { formatPrice, conditionLabels } from '@/lib/utils';
+import { track } from '@/lib/analytics';
 import ProductCard from '@/components/product/ProductCard';
 import type { Product } from '@/types';
 
@@ -100,6 +101,7 @@ export default function SearchPage() {
         setProducts([]);
       } else {
         setProducts(data as Product[]);
+        if (q) track('search', { query: q, value: data.length });
       }
     } catch {
       setProducts([]);

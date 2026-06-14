@@ -1,8 +1,19 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createPixOrder, createCreditCardOrder, type CreateOrderParams } from '@/lib/pagbank'
+import { rateLimit, getClientIp } from '@/lib/rate-limit'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  // Rate limit: 10 tentativas de pagamento por minuto por IP
+  const ip = getClientIp(request);
+  const rl = rateLimit(`payments-create:${ip}`, { limit: 10, windowSec: 60 });
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: 'Muitas tentativas de pagamento. Aguarde antes de tentar novamente.' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+    );
+  }
+
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 

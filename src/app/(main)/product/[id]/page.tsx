@@ -10,6 +10,7 @@ import {
   ShieldCheck, Loader2, ShoppingCart,
 } from 'lucide-react';
 import { formatPrice, formatDistance, conditionLabels, formatRelativeTime } from '@/lib/utils';
+import { track } from '@/lib/analytics';
 import ProductCard from '@/components/product/ProductCard';
 import { ProductJsonLd } from '@/components/seo/JsonLd';
 import AuctionBid from '@/components/auction/AuctionBid';
@@ -96,6 +97,15 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       const data = await getProduct(params.id);
       setProduct(data);
       setLoadingProduct(false);
+
+      if (data) {
+        track('product_view', {
+          product_id: data.id,
+          product_title: data.title,
+          category: data.category_id,
+          price: data.price,
+        });
+      }
 
       // Incrementar contador de visualizações de forma assíncrona
       const supabase = createClient();

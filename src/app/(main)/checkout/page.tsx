@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, CreditCard, QrCode, Shield, MapPin, Truck, Package, ChevronRight, Lock, CheckCircle, Users, HandHeart, Loader2, Copy, AlertCircle } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
 import { createPayment, calculateSplit } from '@/lib/payments';
+import { track, trackPurchase } from '@/lib/analytics';
 import { useAuthStore } from '@/stores/authStore';
 import { createClient } from '@/lib/supabase/client';
 
@@ -51,7 +52,8 @@ export default function CheckoutPage() {
             image: (data.images as any[])?.[0]?.url || '',
           });
         } else {
-          setProduct({ id: 'prod-1', title: 'iPhone 14 Pro Max 256GB', price: 5200, sellerId: 'seller-1', seller: 'Maria Santos', image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=200' });
+          router.replace('/');
+          return;
         }
         setProductLoading(false);
       });
@@ -82,6 +84,13 @@ export default function CheckoutPage() {
       return;
     }
 
+    track('checkout_start', {
+      product_id: product.id,
+      product_title: product.title,
+      price: finalPrice,
+      payment_method: paymentMethod,
+    });
+
     setError('');
     setLoading(true);
 
@@ -106,6 +115,12 @@ export default function CheckoutPage() {
             expiresAt: result.pixExpiresAt || '',
           });
         } else if (result.status === 'approved') {
+          trackPurchase({
+            transactionId: (result as { transactionId?: string }).transactionId || product.id + '-' + Date.now(),
+            productId: product.id,
+            productTitle: product.title,
+            value: finalPrice,
+          });
           setPaymentSuccess(true);
         }
       } else {

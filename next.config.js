@@ -10,11 +10,13 @@ const nextConfig = {
   //   VAPID_SUBJECT
   //   SUPABASE_SERVICE_ROLE_KEY
   //   CRON_SECRET
+  //   PAYMENT_GATEWAY_SECRET_KEY
+  //   PAYMENT_GATEWAY_PUBLIC_KEY
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     remotePatterns: [
@@ -29,6 +31,10 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'chart.googleapis.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
       },
     ],
   },

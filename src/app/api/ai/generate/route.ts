@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { CATEGORIES } from '@/lib/constants';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 const conditionDescriptions: Record<string, string> = {
   new: 'novo, sem uso, na embalagem original',
@@ -85,6 +86,16 @@ function generateDescription(params: {
 }
 
 export async function POST(req: NextRequest) {
+  // Rate limit: 20 req/min per IP
+  const ip = getClientIp(req);
+  const rl = rateLimit(`ai-generate:${ip}`, { limit: 20, windowSec: 60 });
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: 'Muitas requisições. Tente novamente em instantes.' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+    );
+  }
+
   try {
     const supabase = createClient();
     const {
