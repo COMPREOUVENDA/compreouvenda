@@ -234,7 +234,7 @@ export async function notifyNewOrder(
 ): Promise<void> {
   await sendPushNotification(sellerId, {
     title: 'Novo Pedido! 🛍️',
-    body: `${orderData.buyerName} comprou "${orderData.productName}" por R$ ${(orderData.amount / 100).toFixed(2)}`,
+    body: `${orderData.buyerName} comprou "${orderData.productName}" por R$ ${orderData.amount.toFixed(2)}`,
     icon: '/icons/icon-192.png',
     url: `/orders/${orderData.orderId}`,
     type: 'new_order',
@@ -268,7 +268,7 @@ export async function notifyProductSold(
 ): Promise<void> {
   await sendPushNotification(sellerId, {
     title: 'Produto Vendido! 🎉',
-    body: `"${productData.productName}" foi vendido por R$ ${(productData.price / 100).toFixed(2)}`,
+    body: `"${productData.productName}" foi vendido por R$ ${productData.price.toFixed(2)}`,
     icon: '/icons/icon-192.png',
     url: `/product/${productData.productId}`,
     type: 'product_sold',
@@ -284,7 +284,7 @@ export async function notifyPaymentReceived(
 ): Promise<void> {
   await sendPushNotification(sellerId, {
     title: 'Pagamento Recebido! 💰',
-    body: `R$ ${(amount / 100).toFixed(2)} foi liberado para você`,
+    body: `R$ ${amount.toFixed(2)} foi liberado para você`,
     icon: '/icons/icon-192.png',
     url: orderId ? `/orders/${orderId}` : '/dashboard',
     type: 'payment_received',

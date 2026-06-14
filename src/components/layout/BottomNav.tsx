@@ -12,7 +12,7 @@ const BASE_NAV = [
   { href: '/search', icon: Search, label: 'Buscar' },
   { href: '/product/new', icon: PlusCircle, label: 'Vender', isSell: true },
   { href: '/chat', icon: MessageCircle, label: 'Chat', isChat: true },
-  { href: '/dashboard', icon: User, label: 'Perfil' },
+  { href: '/settings', icon: User, label: 'Perfil' },
 ];
 
 export default function BottomNav() {

@@ -69,7 +69,7 @@ export default function SellerWalletPage() {
       balance: wallet.balance - amount, pending_balance: (wallet.pending_balance || 0) + amount
     }).eq('user_id', user.id);
     await supabase.from('wallet_transactions').insert({
-      wallet_id: wallet.balance ? undefined : undefined, user_id: user.id, type: 'withdrawal', amount: -amount, description: `Saque via PIX (${pixKeyType})`, status: 'pending'
+      user_id: user.id, type: 'withdrawal', amount: -amount, description: `Saque via PIX (${pixKeyType})`, status: 'pending'
     });
 
     setMessage('Solicitação de saque enviada! Processamento em até 24h.');

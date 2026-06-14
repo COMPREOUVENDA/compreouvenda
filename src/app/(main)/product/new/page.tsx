@@ -112,6 +112,7 @@ export default function NewProductPage() {
   const [locationLat, setLocationLat] = useState<number | null>(null);
   const [locationLng, setLocationLng] = useState<number | null>(null);
   const [locationCity, setLocationCity] = useState('');
+  const [locationState, setLocationState] = useState('');
 
   const { createProduct } = useProducts();
   const router = useRouter();
@@ -131,7 +132,9 @@ export default function NewProductPage() {
           if (res.ok) {
             const geo = await res.json();
             const city = geo.address?.city || geo.address?.town || geo.address?.village || '';
+            const state = geo.address?.state_code || geo.address?.state || '';
             setLocationCity(city);
+            setLocationState(state.length <= 2 ? state.toUpperCase() : state.slice(0, 2).toUpperCase());
           }
         } catch { /* ignore */ }
         setLocationLoading(false);
@@ -286,8 +289,8 @@ export default function NewProductPage() {
         category_id: categoryId,
         price: parseFloat(price),
         condition,
-        city: 'São Paulo',
-        state: 'SP',
+        city: locationCity || 'São Paulo',
+        state: locationState || 'SP',
         negotiation_radius_km: radius,
         allow_resale_by_others: allowCommission,
         reseller_commission_type: allowCommission ? 'percentage' : undefined,
