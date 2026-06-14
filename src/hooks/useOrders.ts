@@ -95,8 +95,8 @@ export function useOrders() {
 
   const getMyOrders = useCallback(async (): Promise<Order[]> => {
     if (!user) {
-      setOrders(MOCK_ORDERS);
-      return MOCK_ORDERS;
+      setOrders([]);
+      return [];
     }
     setLoading(true);
     try {
@@ -106,15 +106,19 @@ export function useOrders() {
         .eq('buyer_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (fetchError || !data || data.length === 0) {
-        setOrders(MOCK_ORDERS);
-        return MOCK_ORDERS;
+      if (fetchError) {
+        setOrders([]);
+        return [];
       }
-      setOrders(data as Order[]);
-      return data as Order[];
+      const normalized = (data as Order[]).map((o) => ({
+        ...o,
+        net_value: o.net_value || (o.gross_value - (o.platform_fee || 0) - (o.gateway_fee || 0) - (o.reseller_commission_value || 0)),
+      }));
+      setOrders(normalized);
+      return normalized;
     } catch {
-      setOrders(MOCK_ORDERS);
-      return MOCK_ORDERS;
+      setOrders([]);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -137,8 +141,12 @@ export function useOrders() {
         setSales([]);
         return [];
       }
-      setSales(data as Order[]);
-      return data as Order[];
+      const normalized = (data as Order[]).map((o) => ({
+        ...o,
+        net_value: o.net_value || (o.gross_value - (o.platform_fee || 0) - (o.gateway_fee || 0) - (o.reseller_commission_value || 0)),
+      }));
+      setSales(normalized);
+      return normalized;
     } catch {
       setSales([]);
       return [];
