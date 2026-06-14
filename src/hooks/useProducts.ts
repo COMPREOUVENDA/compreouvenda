@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Product, ProductImage } from '@/types';
-import { MOCK_PRODUCTS } from '@/lib/constants';
 
 const supabase = createClient();
 
@@ -65,28 +64,14 @@ export function useProducts() {
       const { data, error: fetchError } = await query.limit(50);
 
       if (fetchError) {
-        console.warn('Supabase fetch failed, using mock:', fetchError.message);
-        setProducts(MOCK_PRODUCTS as Product[]);
-      } else if (data && data.length > 0) {
-        // If real products exist but none have images, complement with mocks for demo
-        const hasAnyImage = data.some(
-          (p: any) => (p.images && p.images.length > 0) || p.video_thumbnail
-        );
-        if (!hasAnyImage) {
-          // Merge real products at top, mocks fill the rest (filtered out by id overlap)
-          const realIds = new Set(data.map((p: any) => p.id));
-          const mockFill = (MOCK_PRODUCTS as Product[]).filter((m) => !realIds.has(m.id));
-          setProducts([...(data as Product[]), ...mockFill]);
-        } else {
-          setProducts(data as Product[]);
-        }
+        console.warn('Supabase fetch failed:', fetchError.message);
+        setProducts([]);
       } else {
-        // No products in DB yet, show mock for demo
-        setProducts(MOCK_PRODUCTS as Product[]);
+        setProducts((data as Product[]) || []);
       }
     } catch (e: any) {
       console.warn('Products fetch error:', e.message);
-      setProducts(MOCK_PRODUCTS as Product[]);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -110,11 +95,7 @@ export function useProducts() {
       .eq('id', id)
       .single();
 
-    if (error || !data) {
-      // Try mock
-      const mock = (MOCK_PRODUCTS as Product[]).find(p => p.id === id);
-      return mock || null;
-    }
+    if (error || !data) return null;
     return data as Product;
   }, []);
 
