@@ -61,14 +61,12 @@ export async function POST(request: Request) {
       .single()
 
     if (order) {
-      // Criar registro de escrow
-      await supabase.from('escrow').upsert({
+      // Criar/atualizar registro de escrow na tabela correta
+      await supabase.from('escrow_transactions').upsert({
         order_id: order.id,
-        seller_id: order.seller_id,
-        buyer_id: order.buyer_id,
         amount: order.total,
-        status: 'held',
-        held_at: new Date().toISOString()
+        status: 'payment_held',
+        held_at: new Date().toISOString(),
       }, { onConflict: 'order_id' })
 
       // Atualizar produto como vendido

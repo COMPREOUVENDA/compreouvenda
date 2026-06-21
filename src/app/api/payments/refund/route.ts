@@ -63,8 +63,8 @@ export async function POST(request: Request) {
     }).eq('id', orderId)
 
     // Atualizar escrow
-    await supabase.from('escrow').update({
-      status: 'refunded',
+    await supabase.from('escrow_transactions').update({
+      status: 'cancelled',
       released_at: new Date().toISOString()
     }).eq('order_id', orderId)
 
