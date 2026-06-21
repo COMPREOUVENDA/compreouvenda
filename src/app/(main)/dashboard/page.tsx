@@ -5,7 +5,7 @@ import {
   Package, ShoppingBag, Heart, Video, Users, HandHeart, TrendingUp,
   Settings, Bell, Store, UserCheck, Percent, Loader2,
   CheckCircle, Save, Trash2, Download, AlertTriangle, X, Shield,
-  FileText, Mail, ToggleLeft, ToggleRight, Lock, Pencil,
+  FileText, Mail, ToggleLeft, ToggleRight, Lock, Pencil, Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -18,6 +18,7 @@ import { formatPrice, formatRelativeTime } from '@/lib/utils';
 import ProductCard from '@/components/product/ProductCard';
 import StarRating from '@/components/ui/StarRating';
 import FirstSellCTA from '@/components/onboarding/FirstSellCTA';
+import BoostProductModal from '@/components/ads/BoostProductModal';
 import type { Product, Order } from '@/types';
 import { logAudit } from '@/lib/audit';
 
@@ -269,6 +270,7 @@ export default function DashboardPage() {
   const [commissions, setCommissions] = useState<Order[]>([]);
   const [userRating, setUserRating] = useState({ average: 0, count: 0 });
   const [loadingListings, setLoadingListings] = useState(false);
+  const [boostProduct, setBoostProduct] = useState<{ id: string; title: string } | null>(null);
 
   const { user } = useAuthStore();
   const { favorites } = useFavorites();
@@ -627,6 +629,7 @@ export default function DashboardPage() {
   ];
 
   return (
+    <>
     <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Toast */}
       {toast && (
@@ -805,7 +808,15 @@ export default function DashboardPage() {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {userListings.map((p) => (
-                <ProductCard key={p.id} product={p} style="card" />
+                <div key={p.id} className="relative group">
+                  <ProductCard product={p} style="card" />
+                  <button
+                    onClick={() => setBoostProduct({ id: p.id, title: p.title })}
+                    className="absolute bottom-2 left-2 right-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 text-xs font-bold py-1.5 rounded-xl flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                  >
+                    <Zap className="w-3 h-3" /> Impulsionar
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -1274,5 +1285,16 @@ export default function DashboardPage() {
       )}
 
     </div>
+
+    {/* Modal de impulsionamento de produto */}
+    {boostProduct && (
+      <BoostProductModal
+        productId={boostProduct.id}
+        productTitle={boostProduct.title}
+        onClose={() => setBoostProduct(null)}
+        onSuccess={() => setBoostProduct(null)}
+      />
+    )}
+    </>
   );
 }

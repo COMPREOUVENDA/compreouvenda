@@ -3,13 +3,14 @@
 import { memo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart, MapPin, Play, Zap, Users, HandHeart, Gavel, Package } from 'lucide-react';
+import { Heart, MapPin, Play, Zap, Users, HandHeart, Gavel, Package, Star } from 'lucide-react';
 import type { Product } from '@/types';
 import { formatPrice, formatDistance, formatRelativeTime, conditionLabels } from '@/lib/utils';
 
 interface ProductCardProps {
   product: Product;
   style?: 'card' | 'feed';
+  viewMode?: 'grid' | 'feed';
 }
 
 const PLACEHOLDER_GRADIENTS = [
@@ -26,11 +27,13 @@ function getPlaceholderGradient(id: string): string {
   return PLACEHOLDER_GRADIENTS[idx];
 }
 
-function ProductCard({ product, style = 'card' }: ProductCardProps) {
+function ProductCard({ product, style = 'card', viewMode }: ProductCardProps) {
+  // viewMode='grid' → alias para style='card'
+  const effectiveStyle = viewMode === 'feed' ? 'feed' : viewMode === 'grid' ? 'card' : style;
   const mainImage = product.images?.[0]?.url || product.video_thumbnail || '';
   const hasImage = Boolean(mainImage);
 
-  if (style === 'feed') {
+  if (effectiveStyle === 'feed') {
     return (
       <Link href={`/product/${product.id}`} className="block">
         <div className="relative aspect-[3/4] rounded-3xl overflow-hidden group">
@@ -58,6 +61,11 @@ function ProductCard({ product, style = 'card' }: ProductCardProps) {
 
           {/* Badges */}
           <div className="absolute top-4 right-4 flex flex-col gap-2">
+            {product.is_featured && (
+              <div className="bg-yellow-400 text-yellow-900 text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
+                <Star className="w-3 h-3 fill-yellow-900" aria-hidden="true" /> DESTAQUE
+              </div>
+            )}
             {product.flash_offer_enabled && product.flash_offer_status === 'active' && (
               <div className="bg-brand-pink text-white text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
                 <Zap className="w-3 h-3" aria-hidden="true" /> OFERTA
@@ -92,12 +100,18 @@ function ProductCard({ product, style = 'card' }: ProductCardProps) {
           {/* Content */}
           <div className="absolute bottom-0 left-0 right-0 p-5">
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-full bg-gradient-brand flex items-center justify-center text-white text-xs font-bold" aria-hidden="true">
-                {product.user?.name?.charAt(0) || 'U'}
-              </div>
-              <span className="text-white/80 text-sm font-medium">
-                {product.user?.name}
-              </span>
+              <Link
+                href={`/seller/${product.user_id}`}
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-7 h-7 rounded-full bg-gradient-brand flex items-center justify-center text-white text-xs font-bold" aria-hidden="true">
+                  {product.user?.name?.charAt(0) || 'U'}
+                </div>
+                <span className="text-white/80 text-sm font-medium">
+                  {product.user?.name}
+                </span>
+              </Link>
               {product.user?.is_pro && (
                 <span className="bg-brand-gold text-white text-[10px] font-bold px-1.5 py-0.5 rounded">PRO</span>
               )}

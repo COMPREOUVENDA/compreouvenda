@@ -82,6 +82,9 @@ export interface Product {
   flash_offer_price?: number;
   flash_offer_end_at?: string;
   flash_offer_status?: 'active' | 'expired' | 'cancelled';
+  // Featured / Patrocinado
+  is_featured?: boolean;
+  featured_until?: string;
   // Meta
   views_count: number;
   favorites_count: number;
