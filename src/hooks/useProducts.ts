@@ -38,6 +38,8 @@ export function useProducts() {
   const [error, setError] = useState<string | null>(null);
 
   // Fetch products from Supabase, fallback to mock
+  // Consulta otimizada: usa thumbnail_url desnormalizado (sem LATERAL JOIN)
+  // para eliminar N subqueries no feed. Imagens completas só na página de detalhe.
   const fetchProducts = useCallback(async (categoryId?: string, search?: string) => {
     setLoading(true);
     setError(null);

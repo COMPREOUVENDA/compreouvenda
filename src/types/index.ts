@@ -85,6 +85,8 @@ export interface Product {
   // Featured / Patrocinado
   is_featured?: boolean;
   featured_until?: string;
+  // Imagem de capa desnormalizada (evita LATERAL JOIN no feed)
+  thumbnail_url?: string;
   // Meta
   views_count: number;
   favorites_count: number;

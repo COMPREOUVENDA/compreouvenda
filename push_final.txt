@@ -1,0 +1,10 @@
+warning: in the working copy of 'next.config.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/api/ai/generate/route.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/Analytics.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/analytics.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/rate-limit.ts', LF will be replaced by CRLF the next time Git touches it
+[main 55b67ba] chore: traduzir comentarios e variaveis para portugues (rate-limit, analytics, ai/generate, Analytics.tsx, next.config)
+ 5 files changed, 108 insertions(+), 106 deletions(-)
+To https://github.com/COMPREOUVENDA/compreouvenda.git
+   5cf513b..55b67ba  HEAD -> main
+DONE=0 
