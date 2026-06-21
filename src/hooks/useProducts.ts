@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Product, ProductImage } from '@/types';
+import type { FeedFilters } from '@/components/feed/FilterDrawer';
 
 const supabase = createClient();
+const PAGE_SIZE = 20;
 
 interface CreateProductData {
   title: string;
@@ -32,62 +34,123 @@ interface CreateProductData {
   flash_offer_end_at?: string;
 }
 
+// Seleção enxuta para o feed (thumbnail_url desnormalizado - migration 013)
+const FEED_SELECT = `
+  id, title, price, condition, city, state, views_count, favorites_count,
+  is_featured, featured_until, thumbnail_url, category_id, user_id,
+  flash_offer_enabled, flash_offer_price, flash_offer_status, flash_offer_end_at,
+  auction_enabled, current_bid, bid_count, auction_end_at,
+  is_donation, donation_percentage, created_at, updated_at,
+  user:users!products_user_id_fkey(id, name, avatar_url, city, state),
+  category:categories!products_category_id_fkey(id, name, icon, slug)
+`;
+
 export function useProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const pageRef = useRef(0);
+  const filtersRef = useRef<{ categoryId?: string; search?: string; feedFilters?: FeedFilters }>({});
 
-  // Fetch products from Supabase, fallback to mock
-  // Consulta otimizada: usa thumbnail_url desnormalizado (sem LATERAL JOIN)
-  // para eliminar N subqueries no feed. Imagens completas só na página de detalhe.
-  const fetchProducts = useCallback(async (categoryId?: string, search?: string) => {
+  const buildQuery = useCallback((categoryId?: string, search?: string, feedFilters?: FeedFilters, offset = 0) => {
+    let q = supabase
+      .from('products')
+      .select(FEED_SELECT)
+      .eq('status', 'active');
+
+    if (categoryId) q = q.eq('category_id', categoryId);
+
+    if (search) {
+      q = q.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+    }
+
+    if (feedFilters) {
+      if (feedFilters.priceMin) q = q.gte('price', parseFloat(feedFilters.priceMin));
+      if (feedFilters.priceMax) q = q.lte('price', parseFloat(feedFilters.priceMax));
+      if (feedFilters.conditions.length > 0) q = q.in('condition', feedFilters.conditions);
+      if (feedFilters.onlyFeatured) q = q.eq('is_featured', true);
+
+      switch (feedFilters.sort) {
+        case 'price_asc':
+          q = q.order('price', { ascending: true });
+          break;
+        case 'price_desc':
+          q = q.order('price', { ascending: false });
+          break;
+        case 'popular':
+          q = q.order('views_count', { ascending: false });
+          break;
+        default:
+          q = q.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
+      }
+    } else {
+      q = q.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
+    }
+
+    return q.range(offset, offset + PAGE_SIZE - 1);
+  }, []);
+
+  const fetchProducts = useCallback(async (categoryId?: string, search?: string, feedFilters?: FeedFilters) => {
     setLoading(true);
     setError(null);
+    pageRef.current = 0;
+    filtersRef.current = { categoryId, search, feedFilters };
 
     try {
-      // Feed: select enxuto — thumbnail_url já está em products (migration 013)
-      let query = supabase
-        .from('products')
-        .select(`
-          id, title, price, condition, city, state, views_count, favorites_count,
-          is_featured, featured_until, thumbnail_url, category_id, user_id,
-          flash_offer_enabled, flash_offer_price, flash_offer_status, flash_offer_end_at,
-          auction_enabled, current_bid, bid_count, auction_end_at,
-          is_donation, donation_percentage, created_at, updated_at,
-          user:users!products_user_id_fkey(id, name, avatar_url, city, state),
-          category:categories!products_category_id_fkey(id, name, icon, slug)
-        `)
-        .eq('status', 'active')
-        .order('is_featured', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (categoryId) query = query.eq('category_id', categoryId);
-      if (search) {
-        query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
-      }
-
-      const { data, error: fetchError } = await query.limit(50);
+      const { data, error: fetchError } = await buildQuery(categoryId, search, feedFilters, 0);
 
       if (fetchError) {
         console.warn('Supabase fetch failed:', fetchError.message);
         setProducts([]);
+        setHasMore(false);
       } else {
-        setProducts((data as Product[]) || []);
+        const list = (data as unknown as Product[]) || [];
+        setProducts(list);
+        setHasMore(list.length === PAGE_SIZE);
+        pageRef.current = 1;
       }
     } catch (e: any) {
       console.warn('Products fetch error:', e.message);
       setProducts([]);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [buildQuery]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+
+    const { categoryId, search, feedFilters } = filtersRef.current;
+    const offset = pageRef.current * PAGE_SIZE;
+
+    try {
+      const { data, error: fetchError } = await buildQuery(categoryId, search, feedFilters, offset);
+
+      if (!fetchError && data) {
+        const newItems = data as unknown as Product[];
+        setProducts((prev) => [...prev, ...newItems]);
+        setHasMore(newItems.length === PAGE_SIZE);
+        pageRef.current += 1;
+      } else {
+        setHasMore(false);
+      }
+    } catch {
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, buildQuery]);
 
   // Initial load
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
-  // Get single product
+  // Get single product (full data with images)
   const getProduct = useCallback(async (id: string): Promise<Product | null> => {
     const { data, error } = await supabase
       .from('products')
@@ -110,11 +173,9 @@ export function useProducts() {
     setError(null);
 
     try {
-      // Get current user
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) throw new Error('Usuário não autenticado');
 
-      // Get user profile
       const { data: profile } = await supabase
         .from('users')
         .select('id')
@@ -123,7 +184,6 @@ export function useProducts() {
 
       if (!profile) throw new Error('Perfil não encontrado');
 
-      // Insert product
       const { data: product, error: insertError } = await supabase
         .from('products')
         .insert({
@@ -139,12 +199,10 @@ export function useProducts() {
 
       if (insertError) throw insertError;
 
-      // Upload images
       if (images.length > 0 && product) {
         await uploadProductImages(product.id, profile.id, images);
       }
 
-      // Refresh list
       await fetchProducts();
       return product as Product;
     } catch (e: any) {
@@ -155,7 +213,7 @@ export function useProducts() {
     }
   }, [fetchProducts]);
 
-  // Upload images for a product
+  // Upload images
   const uploadProductImages = async (productId: string, userId: string, images: File[]) => {
     const LABELS = ['Frontal', 'Traseira', 'Lateral Esq.', 'Lateral Dir.', 'Detalhe 1', 'Detalhe 2', 'Detalhe 3', 'Detalhe 4'];
 
@@ -164,7 +222,6 @@ export function useProducts() {
       const ext = file.name.split('.').pop() || 'jpg';
       const path = `${userId}/${productId}/${i + 1}.${ext}`;
 
-      // Upload to storage
       const { error: uploadError } = await supabase.storage
         .from('products')
         .upload(path, file, { upsert: true, contentType: file.type });
@@ -174,12 +231,8 @@ export function useProducts() {
         continue;
       }
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('products')
-        .getPublicUrl(path);
+      const { data: urlData } = supabase.storage.from('products').getPublicUrl(path);
 
-      // Insert image record
       await supabase.from('product_images').insert({
         product_id: productId,
         url: urlData.publicUrl,
@@ -204,7 +257,7 @@ export function useProducts() {
     return true;
   }, [fetchProducts]);
 
-  // Delete (soft) product
+  // Soft delete
   const deleteProduct = useCallback(async (id: string): Promise<boolean> => {
     const { error } = await supabase
       .from('products')
@@ -219,7 +272,7 @@ export function useProducts() {
     return true;
   }, [fetchProducts]);
 
-  // Search
+  // Search (alias to fetchProducts with search)
   const searchProducts = useCallback((query: string, categoryId?: string) => {
     fetchProducts(categoryId || undefined, query || undefined);
   }, [fetchProducts]);
@@ -227,8 +280,11 @@ export function useProducts() {
   return {
     products,
     loading,
+    loadingMore,
+    hasMore,
     error,
     fetchProducts,
+    loadMore,
     getProduct,
     createProduct,
     updateProduct,

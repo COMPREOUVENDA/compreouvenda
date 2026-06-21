@@ -12,7 +12,7 @@ const BASE_NAV = [
   { href: '/search', icon: Search, label: 'Buscar' },
   { href: '/product/new', icon: PlusCircle, label: 'Vender', isSell: true },
   { href: '/chat', icon: MessageCircle, label: 'Chat', isChat: true },
-  { href: '/settings', icon: User, label: 'Perfil' },
+  { href: '/profile', icon: User, label: 'Perfil' },
 ];
 
 export default function BottomNav() {
@@ -43,7 +43,7 @@ export default function BottomNav() {
     >
       <div className="flex items-center justify-around py-2">
         {BASE_NAV.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           const isSell = item.isSell;
           const isChat = (item as any).isChat;
 
