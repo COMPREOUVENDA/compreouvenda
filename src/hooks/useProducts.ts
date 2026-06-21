@@ -45,20 +45,23 @@ export function useProducts() {
     setError(null);
 
     try {
+      // Feed: select enxuto — thumbnail_url já está em products (migration 013)
       let query = supabase
         .from('products')
         .select(`
-          *,
-          images:product_images(id, url, position, label),
+          id, title, price, condition, city, state, views_count, favorites_count,
+          is_featured, featured_until, thumbnail_url, category_id, user_id,
+          flash_offer_enabled, flash_offer_price, flash_offer_status, flash_offer_end_at,
+          auction_enabled, current_bid, bid_count, auction_end_at,
+          is_donation, donation_percentage, created_at, updated_at,
           user:users!products_user_id_fkey(id, name, avatar_url, city, state),
           category:categories!products_category_id_fkey(id, name, icon, slug)
         `)
         .eq('status', 'active')
+        .order('is_featured', { ascending: false })
         .order('created_at', { ascending: false });
 
-      if (categoryId) {
-        query = query.eq('category_id', categoryId);
-      }
+      if (categoryId) query = query.eq('category_id', categoryId);
       if (search) {
         query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
       }

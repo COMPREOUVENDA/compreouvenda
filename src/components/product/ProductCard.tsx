@@ -30,7 +30,8 @@ function getPlaceholderGradient(id: string): string {
 function ProductCard({ product, style = 'card', viewMode }: ProductCardProps) {
   // viewMode='grid' → alias para style='card'
   const effectiveStyle = viewMode === 'feed' ? 'feed' : viewMode === 'grid' ? 'card' : style;
-  const mainImage = product.images?.[0]?.url || product.video_thumbnail || '';
+  // Prioridade: thumbnail_url desnormalizado (feed rápido) → imagem do array → placeholder
+  const mainImage = product.thumbnail_url || product.images?.[0]?.url || product.video_thumbnail || '';
   const hasImage = Boolean(mainImage);
 
   if (effectiveStyle === 'feed') {

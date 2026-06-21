@@ -1,72 +1,98 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { WifiOff, RefreshCw, Home, Wifi } from 'lucide-react';
 
 export default function OfflinePage() {
+  const [retrying, setRetrying] = useState(false);
+  const [dots, setDots] = useState('');
+
+  // Animação de pontinhos no "Tentando reconectar..."
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots((d) => (d.length >= 3 ? '' : d + '.'));
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Verificar automaticamente quando a conexão voltar
+  useEffect(() => {
+    const handleOnline = () => {
+      window.location.reload();
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
+
+  function handleRetry() {
+    setRetrying(true);
+    setTimeout(() => {
+      window.location.reload();
+    }, 800);
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-6 text-center">
-      {/* Logo */}
-      <div className="mb-8">
-        <Image
-          src="/logo-full.png"
-          alt="COMPREOUVENDA.COM"
-          width={220}
-          height={60}
-          className="h-14 w-auto object-contain mx-auto"
-        />
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-950/30 to-gray-900 flex flex-col items-center justify-center px-6 text-center">
+
+      {/* Ícone animado */}
+      <div className="relative mb-8">
+        <div className="w-24 h-24 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+          <WifiOff className="w-10 h-10 text-purple-400" />
+        </div>
+        {/* Pulsar */}
+        <div className="absolute inset-0 rounded-full border border-purple-500/20 animate-ping opacity-30" />
       </div>
 
-      {/* Offline illustration */}
-      <div className="w-24 h-24 rounded-full bg-brand-purple/10 flex items-center justify-center mb-6">
-        <svg
-          className="w-12 h-12 text-brand-purple"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M18.364 5.636a9 9 0 010 12.728M15.536 8.464a5 5 0 010 7.072M12 13a1 1 0 100-2 1 1 0 000 2zm-3.536-1.464a5 5 0 007.072 0M5.636 5.636a9 9 0 000 12.728"
-          />
-          <line x1="3" y1="3" x2="21" y2="21" strokeLinecap="round" strokeWidth={1.5} />
-        </svg>
-      </div>
-
-      {/* Message */}
-      <h1 className="font-display font-bold text-2xl text-gray-900 mb-3">
-        Você está sem conexão
+      {/* Mensagem */}
+      <h1 className="font-bold text-2xl text-white mb-3">
+        Você está offline
       </h1>
-      <p className="text-gray-500 text-base leading-relaxed max-w-xs mb-8">
-        Verifique sua internet e tente novamente. Algumas páginas já visitadas ainda estão disponíveis.
+      <p className="text-gray-400 text-sm leading-relaxed max-w-xs mb-2">
+        Verifique sua conexão com a internet e tente novamente.
+      </p>
+      <p className="text-gray-500 text-xs mb-8">
+        Monitorando conexão{dots}
       </p>
 
-      {/* Retry button */}
+      {/* Dica de cache */}
+      <div className="bg-purple-500/10 border border-purple-500/20 rounded-2xl px-5 py-4 max-w-xs mb-8">
+        <div className="flex items-center gap-2 mb-1">
+          <Wifi className="w-4 h-4 text-purple-400" />
+          <span className="text-purple-300 text-sm font-medium">Conteúdo em cache</span>
+        </div>
+        <p className="text-gray-400 text-xs leading-relaxed">
+          Páginas visitadas recentemente ainda podem estar disponíveis. Tente navegar normalmente.
+        </p>
+      </div>
+
+      {/* Botões */}
       <button
-        onClick={() => window.location.reload()}
-        className="btn-primary mb-4"
-        aria-label="Tentar reconectar"
+        onClick={handleRetry}
+        disabled={retrying}
+        className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-semibold px-6 py-3 rounded-2xl transition-all mb-3 w-full max-w-xs justify-center"
       >
-        Tentar novamente
+        <RefreshCw className={`w-4 h-4 ${retrying ? 'animate-spin' : ''}`} />
+        {retrying ? 'Reconectando...' : 'Tentar novamente'}
       </button>
 
       <Link
         href="/"
-        className="text-brand-blue text-sm font-medium hover:underline"
-        aria-label="Ir para a página inicial"
+        className="flex items-center gap-2 text-gray-400 hover:text-white text-sm font-medium transition-colors"
       >
+        <Home className="w-4 h-4" />
         Ir para o início
       </Link>
 
-      {/* Brand colors accent */}
+      {/* Brand dots */}
       <div className="mt-12 flex gap-2" aria-hidden="true">
-        <div className="w-3 h-3 rounded-full bg-brand-purple" />
-        <div className="w-3 h-3 rounded-full bg-brand-blue" />
-        <div className="w-3 h-3 rounded-full bg-brand-orange" />
-        <div className="w-3 h-3 rounded-full bg-brand-pink" />
-        <div className="w-3 h-3 rounded-full bg-brand-gold" />
+        <div className="w-2 h-2 rounded-full bg-purple-500" />
+        <div className="w-2 h-2 rounded-full bg-blue-500" />
+        <div className="w-2 h-2 rounded-full bg-orange-500" />
+        <div className="w-2 h-2 rounded-full bg-pink-500" />
       </div>
+
+      <p className="text-gray-600 text-xs mt-4">COMPREOUVENDA.COM</p>
     </div>
   );
 }
