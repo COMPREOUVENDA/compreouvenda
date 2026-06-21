@@ -12,17 +12,19 @@ declare global {
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID
 
-function AnalyticsInner() {
+function AnalyticsInterno() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
   useEffect(() => {
     const url = pathname + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
-    // GA4 page_view
+
+    // Registra visualização de página no GA4
     if (GA_ID && typeof window.gtag === 'function') {
       window.gtag('config', GA_ID, { page_path: url })
     }
-    // Vercel Analytics page_view
+
+    // Registra visualização de página no Vercel Analytics
     if (typeof window.va === 'function') {
       window.va('pageview', { path: url })
     }
@@ -34,7 +36,7 @@ function AnalyticsInner() {
 export function Analytics() {
   return (
     <>
-      {/* Google Analytics 4 — ativo somente se GA_ID estiver configurado */}
+      {/* Google Analytics 4 — ativo somente se NEXT_PUBLIC_GA_ID estiver configurado */}
       {GA_ID && (
         <>
           <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} />
@@ -45,7 +47,7 @@ export function Analytics() {
           />
         </>
       )}
-      {/* Vercel Analytics — carregado automaticamente pelo runtime Vercel */}
+      {/* Vercel Analytics — carregado automaticamente pelo runtime da Vercel */}
       <script
         dangerouslySetInnerHTML={{
           __html: `
@@ -61,32 +63,32 @@ export function Analytics() {
         }}
       />
       <Suspense fallback={null}>
-        <AnalyticsInner />
+        <AnalyticsInterno />
       </Suspense>
     </>
   )
 }
 
-// Helpers compatíveis com a lib analytics.ts
-export function trackEvent(action: string, category: string, label?: string, value?: number) {
+// Função auxiliar para rastreamento de eventos
+export function trackEvent(acao: string, categoria: string, rotulo?: string, valor?: number) {
   if (typeof window === 'undefined') return
   if (typeof window.gtag === 'function') {
-    window.gtag('event', action, { event_category: category, event_label: label, value })
+    window.gtag('event', acao, { event_category: categoria, event_label: rotulo, value: valor })
   }
   if (typeof window.va === 'function') {
-    window.va('event', { name: action, category: category, label, value })
+    window.va('event', { name: acao, category: categoria, label: rotulo, value: valor })
   }
 }
 
-export const events = {
-  viewProduct: (id: string, name: string) => trackEvent('view_item', 'product', name),
-  addToCart: (id: string, price: number) => trackEvent('add_to_cart', 'ecommerce', id, price),
-  purchase: (orderId: string, total: number) => trackEvent('purchase', 'ecommerce', orderId, total),
-  search: (query: string) => trackEvent('search', 'engagement', query),
-  signup: (method: string) => trackEvent('sign_up', 'auth', method),
-  login: (method: string) => trackEvent('login', 'auth', method),
-  startChat: (sellerId: string) => trackEvent('start_chat', 'engagement', sellerId),
-  createListing: (category: string) => trackEvent('create_listing', 'seller', category),
-  shareProduct: (id: string) => trackEvent('share', 'engagement', id),
+// Eventos predefinidos do marketplace
+export const eventos = {
+  verProduto:         (id: string, nome: string)        => trackEvent('view_item',      'produto',      nome),
+  adicionarCarrinho:  (id: string, preco: number)       => trackEvent('add_to_cart',    'ecommerce',    id, preco),
+  compra:             (pedidoId: string, total: number)  => trackEvent('purchase',       'ecommerce',    pedidoId, total),
+  busca:              (termo: string)                    => trackEvent('search',          'engajamento',  termo),
+  cadastro:           (metodo: string)                   => trackEvent('sign_up',         'autenticacao', metodo),
+  login:              (metodo: string)                   => trackEvent('login',           'autenticacao', metodo),
+  iniciarChat:        (vendedorId: string)               => trackEvent('start_chat',      'engajamento',  vendedorId),
+  criarAnuncio:       (categoria: string)                => trackEvent('create_listing',  'vendedor',     categoria),
+  compartilharProduto:(id: string)                       => trackEvent('share',           'engajamento',  id),
 }
-

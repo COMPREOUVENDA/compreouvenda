@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { CATEGORIES } from '@/lib/constants';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
-const conditionDescriptions: Record<string, string> = {
+const descricoesCondicao: Record<string, string> = {
   new: 'novo, sem uso, na embalagem original',
   like_new: 'seminovo, pouco uso, excelente estado',
   good: 'bom estado, marcas mínimas de uso',
@@ -11,7 +11,7 @@ const conditionDescriptions: Record<string, string> = {
   used: 'usado, pode ter defeitos ou desgaste',
 };
 
-const conditionLabels: Record<string, string> = {
+const rotulosCondicao: Record<string, string> = {
   new: 'Novo',
   like_new: 'Seminovo',
   good: 'Bom estado',
@@ -19,43 +19,43 @@ const conditionLabels: Record<string, string> = {
   used: 'Usado',
 };
 
-function generateTitle(params: {
+function gerarTitulo(params: {
   hint: string;
   category: string;
   condition: string;
 }): string {
   const { hint, category, condition } = params;
   const cat = CATEGORIES.find((c) => c.id === category);
-  const catName = cat?.name ?? 'Produto';
-  const condLabel = conditionLabels[condition] ?? '';
+  const nomeCategoria = cat?.name ?? 'Produto';
+  const rotuloCondicao = rotulosCondicao[condition] ?? '';
 
   const base = hint.trim();
 
   if (!base) {
-    return `${catName} ${condLabel}`.trim();
+    return `${nomeCategoria} ${rotuloCondicao}`.trim();
   }
 
-  // Already looks like a proper title (>= 20 chars with letters)
-  const words = base.split(/\s+/).filter(Boolean);
-  if (words.length >= 4 && base.length >= 20) {
-    // Enrich: add condition label at start if not present
-    const hasCondition = Object.values(conditionLabels).some((l) =>
-      base.toLowerCase().includes(l.toLowerCase())
+  // Título já parece adequado (>= 20 caracteres com palavras suficientes)
+  const palavras = base.split(/\s+/).filter(Boolean);
+  if (palavras.length >= 4 && base.length >= 20) {
+    // Enriquecer: adicionar condição no início se não estiver presente
+    const temCondicao = Object.values(rotulosCondicao).some((r) =>
+      base.toLowerCase().includes(r.toLowerCase())
     );
-    if (!hasCondition && condLabel) {
-      return `${condLabel} – ${base}`;
+    if (!temCondicao && rotuloCondicao) {
+      return `${rotuloCondicao} – ${base}`;
     }
     return base;
   }
 
-  // Build from scratch
-  const titleParts: string[] = [];
-  if (condLabel) titleParts.push(condLabel);
-  titleParts.push(base || catName);
-  return titleParts.join(' – ');
+  // Construir do zero
+  const partes: string[] = [];
+  if (rotuloCondicao) partes.push(rotuloCondicao);
+  partes.push(base || nomeCategoria);
+  return partes.join(' – ');
 }
 
-function generateDescription(params: {
+function gerarDescricao(params: {
   title: string;
   category: string;
   condition: string;
@@ -63,30 +63,30 @@ function generateDescription(params: {
 }): string {
   const { title, category, condition, price } = params;
   const cat = CATEGORIES.find((c) => c.id === category);
-  const catName = cat?.name ?? 'produto';
-  const condDesc = conditionDescriptions[condition] ?? 'usado';
-  const priceFormatted =
+  const nomeCategoria = cat?.name ?? 'produto';
+  const descCondicao = descricoesCondicao[condition] ?? 'usado';
+  const precoFormatado =
     price > 0
       ? `R$ ${price.toFixed(2).replace('.', ',')}`
       : 'preço a combinar';
 
-  const descriptions = [
-    `Vendo ${title}. Item ${condDesc}.`,
+  const linhas = [
+    `Vendo ${title}. Item ${descCondicao}.`,
     ``,
-    `✅ Produto da categoria ${catName}`,
-    `📦 Condição: ${conditionLabels[condition] ?? condition}`,
-    `💰 Valor: ${priceFormatted}`,
+    `✅ Produto da categoria ${nomeCategoria}`,
+    `📦 Condição: ${rotulosCondicao[condition] ?? condition}`,
+    `💰 Valor: ${precoFormatado}`,
     ``,
     `Entrego pessoalmente ou combino envio. Aceito Pix. Estou aberto a propostas razoáveis.`,
     ``,
     `Entre em contato pelo chat para mais fotos ou informações. Produto sem garantia de loja.`,
   ];
 
-  return descriptions.join('\n');
+  return linhas.join('\n');
 }
 
 export async function POST(req: NextRequest) {
-  // Rate limit: 20 req/min per IP
+  // Limite de requisições: 20 por minuto por IP
   const ip = getClientIp(req);
   const rl = rateLimit(`ai-generate:${ip}`, { limit: 20, windowSec: 60 });
   if (!rl.success) {
@@ -127,19 +127,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (type === 'title') {
-      const title = generateTitle({ hint, category, condition });
-      return NextResponse.json({ success: true, result: title });
+      const titulo = gerarTitulo({ hint, category, condition });
+      return NextResponse.json({ success: true, result: titulo });
     }
 
     if (type === 'description') {
-      const titleForDesc = hint || generateTitle({ hint, category, condition });
-      const description = generateDescription({
-        title: titleForDesc,
+      const tituloBase = hint || gerarTitulo({ hint, category, condition });
+      const descricao = gerarDescricao({
+        title: tituloBase,
         category,
         condition,
         price: Number(price),
       });
-      return NextResponse.json({ success: true, result: description });
+      return NextResponse.json({ success: true, result: descricao });
     }
 
     return NextResponse.json(
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   } catch (err) {
-    console.error('AI generate error:', err);
+    console.error('[IA gerar] Erro ao gerar conteúdo:', err);
     return NextResponse.json(
       { success: false, error: 'Erro ao gerar conteúdo' },
       { status: 500 }

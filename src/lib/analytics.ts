@@ -3,7 +3,7 @@
 /**
  * src/lib/analytics.ts
  * Rastreamento de eventos de conversão — compatível com Vercel Analytics
- * e Google Analytics 4 (via gtag). Usa apenas APIs do browser, sem dependências extras.
+ * e Google Analytics 4 (via gtag). Usa apenas APIs do navegador, sem dependências extras.
  *
  * Eventos rastreados:
  *   product_view       — usuário visualizou um produto
@@ -48,8 +48,8 @@ declare global {
 }
 
 /**
- * Track an analytics event.
- * Sends to Vercel Analytics (va) and/or Google Analytics 4 (gtag) if available.
+ * Registra um evento de analytics.
+ * Envia para Vercel Analytics (va) e/ou Google Analytics 4 (gtag) se disponíveis.
  */
 export function track(event: AnalyticsEvent, properties?: EventProperties): void {
   if (typeof window === 'undefined') return;
@@ -62,19 +62,19 @@ export function track(event: AnalyticsEvent, properties?: EventProperties): void
   // Google Analytics 4
   if (typeof (window as Window & { gtag?: (...args: unknown[]) => void }).gtag === 'function') {
     (window as Window & { gtag: (...args: unknown[]) => void }).gtag('event', event, {
-      event_category: 'engagement',
+      event_category: 'engajamento',
       currency: 'BRL',
       ...properties,
     });
   }
 
-  // Development: log to console
+  // Ambiente de desenvolvimento: exibe no console
   if (process.env.NODE_ENV === 'development') {
     console.debug('[analytics]', event, properties);
   }
 }
 
-/** Convenience: track a page view manually (useful for SPA navigations) */
+/** Registra uma visualização de página manualmente (útil em navegações SPA) */
 export function pageView(path: string): void {
   if (typeof window === 'undefined') return;
   const w = window as Window & { gtag?: (...args: unknown[]) => void };
@@ -85,7 +85,7 @@ export function pageView(path: string): void {
   }
 }
 
-/** Track e-commerce purchase event (GA4 schema) */
+/** Registra evento de compra no e-commerce (schema GA4) */
 export function trackPurchase(params: {
   transactionId: string;
   productId: string;
