@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Search, SlidersHorizontal, Sparkles } from 'lucide-react';
@@ -9,6 +9,7 @@ import { ProductCardSkeleton } from '@/components/product/ProductCardSkeleton';
 import { CATEGORIES } from '@/lib/constants';
 import { useProducts } from '@/hooks/useProducts';
 import HeroCTA from '@/components/home/HeroCTA';
+import { track } from '@/lib/analytics';
 import type { Product } from '@/types';
 
 // Dynamic import for heavy ad carousel
@@ -35,7 +36,8 @@ export default function HomePage() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [searchQuery, selectedCategory, searchProducts]);
 
-  // Filter by category on client side (products already loaded)
+  // Remover filtro duplo: a API já filtra por categoria via searchProducts.
+  // O useMemo mantém apenas como fallback instantâneo antes da resposta da API.
   const filtered = useMemo(
     () => selectedCategory ? products.filter((p) => p.category_id === selectedCategory) : products,
     [products, selectedCategory]
@@ -61,15 +63,13 @@ export default function HomePage() {
     return items;
   }, [filtered]);
 
-  const handleAdImpression = (adId: string) => {
-    // TODO: Send to analytics/Supabase
-    console.log('[Ad Impression]', adId);
-  };
+  const handleAdImpression = useCallback((adId: string) => {
+    track('ad_impression', { ad_id: adId });
+  }, []);
 
-  const handleAdClick = (adId: string) => {
-    // TODO: Send to analytics/Supabase + update budget
-    console.log('[Ad Click]', adId);
-  };
+  const handleAdClick = useCallback((adId: string) => {
+    track('ad_click', { ad_id: adId });
+  }, []);
 
   return (
     <div className="max-w-7xl mx-auto">

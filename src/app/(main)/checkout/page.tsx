@@ -31,17 +31,18 @@ export default function CheckoutPage() {
   useEffect(() => {
     const productId = searchParams.get('productId');
     if (!productId) {
-      // Sem produto — redireciona para home
       router.replace('/');
+      setProductLoading(false);
       return;
     }
     const supabase = createClient();
-    supabase
-      .from('products')
-      .select('id, title, price, user_id, user:users!products_user_id_fkey(name), images:product_images(url)')
-      .eq('id', productId)
-      .single()
-      .then(({ data }) => {
+    const load = async () => {
+      try {
+        const { data } = await supabase
+          .from('products')
+          .select('id, title, price, user_id, user:users!products_user_id_fkey(name), images:product_images(url)')
+          .eq('id', productId)
+          .single();
         if (data) {
           setProduct({
             id: data.id,
@@ -53,11 +54,15 @@ export default function CheckoutPage() {
           });
         } else {
           router.replace('/');
-          return;
         }
+      } catch {
+        router.replace('/');
+      } finally {
         setProductLoading(false);
-      });
-  }, [searchParams]);
+      }
+    };
+    load();
+  }, [searchParams, router]);
 
   if (productLoading || !product) {
     return (

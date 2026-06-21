@@ -1,0 +1,9 @@
+# Arquivos temporários de push/scripts
+*.bat
+*_log.txt
+push_result.txt
+push_node_result.txt
+do_push.js
+dopush.bat
+run_migration*.js
+.env*.local

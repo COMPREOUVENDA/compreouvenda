@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Wallet, ArrowUpRight, ArrowDownLeft, Clock, DollarSign, TrendingUp, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
@@ -21,6 +21,9 @@ interface Transaction {
   created_at: string;
 }
 
+// Instância única fora do componente para evitar recriação a cada render
+const supabase = createClient();
+
 export default function SellerWalletPage() {
   const { user } = useAuthStore();
   const [wallet, setWallet] = useState<WalletData | null>(null);
@@ -33,15 +36,9 @@ export default function SellerWalletPage() {
   const [withdrawing, setWithdrawing] = useState(false);
   const [message, setMessage] = useState('');
 
-  const supabase = createClient();
-
-  useEffect(() => {
-    if (user) loadWallet();
-  }, [user]);
-
-  const loadWallet = async () => {
+  const loadWallet = useCallback(async () => {
     if (!user) return;
-    // Get or create wallet
+    // Buscar ou criar carteira
     let { data } = await supabase.from('seller_wallet').select('*').eq('user_id', user.id).single();
     if (!data) {
       const { data: newWallet } = await supabase.from('seller_wallet').insert({ user_id: user.id }).select().single();
@@ -49,11 +46,20 @@ export default function SellerWalletPage() {
     }
     if (data) setWallet(data);
 
-    // Load transactions
-    const { data: txs } = await supabase.from('wallet_transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20);
+    // Carregar transações
+    const { data: txs } = await supabase
+      .from('wallet_transactions')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
     if (txs) setTransactions(txs);
     setLoading(false);
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) loadWallet();
+  }, [user, loadWallet]);
 
   const handleWithdraw = async () => {
     if (!user || !wallet) return;

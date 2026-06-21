@@ -107,13 +107,9 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         });
       }
 
-      // Incrementar contador de visualizações de forma assíncrona
+      // Incrementar contador de visualizações de forma atômica (sem race condition)
       const supabase = createClient();
-      supabase
-        .from('products')
-        .update({ views_count: (data?.views_count || 0) + 1 })
-        .eq('id', params.id)
-        .then(() => {});
+      supabase.rpc('increment_views', { product_id: params.id }).then(() => {});
     };
     load();
   }, [params.id, getProduct]);
