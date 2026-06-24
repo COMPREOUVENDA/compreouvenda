@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Users, Package, Video, CreditCard, GitBranch, Users2,
   HandHeart, Heart, MapPin, Gavel, Zap, Flag, LifeBuoy, Bell, FileText,
   Settings, Shield, ScrollText, Menu, X, LogOut, ChevronDown, TrendingUp,
-  ShieldCheck, Sparkles,
+  ShieldCheck, Sparkles, Tag, Crown, Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -32,6 +32,8 @@ const MENU_ITEMS = [
   { id: 'geo', label: 'Geolocalização', icon: MapPin, href: '/admin/geo' },
   { id: 'auctions', label: 'Leilões', icon: Gavel, href: '/admin/auctions' },
   { id: 'flash', label: 'Ofertas Flash', icon: Zap, href: '/admin/flash-offers' },
+  { id: 'coupons', label: 'Cupons', icon: Tag, href: '/admin/coupons' },
+  { id: 'subscriptions', label: 'Assinaturas', icon: Crown, href: '/admin/subscriptions' },
   { id: 'reports', label: 'Denúncias', icon: Flag, href: '/admin/reports' },
   { id: 'support', label: 'Suporte', icon: LifeBuoy, href: '/admin/support' },
   { id: 'notifications', label: 'Notificações', icon: Bell, href: '/admin/notifications' },
