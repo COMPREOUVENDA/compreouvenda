@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import Header from '@/components/layout/Header';
 import BottomNav from '@/components/layout/BottomNav';
 import NewMessageToast from '@/components/notifications/NewMessageToast';
+import OrderToast from '@/components/notifications/OrderToast';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,6 +14,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </main>
       <BottomNav />
       <NewMessageToast />
+      <OrderToast />
     </div>
   );
 }

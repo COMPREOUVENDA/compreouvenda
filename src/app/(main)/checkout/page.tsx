@@ -136,6 +136,27 @@ export default function CheckoutPage() {
       });
 
       if (result.success) {
+        // Criar pedido no banco e notificar vendedor
+        const orderRes = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            product_id: product.id,
+            seller_id: product.sellerId,
+            buyer_id: user.id,
+            amount: finalPrice,
+            delivery_type: deliveryType,
+            payment_method: paymentMethod,
+            installments: paymentMethod === 'credit' ? installments : 1,
+            payment_id: (result as any).transactionId || null,
+            coupon_code: couponResult?.valid ? couponCode : null,
+            coupon_discount: couponDiscount,
+          }),
+        });
+        if (!orderRes.ok) {
+          console.warn('[checkout] order creation failed:', await orderRes.text());
+        }
+
         if (result.status === 'pending' && result.pixQrCode) {
           setPixResult({
             qrCode: result.pixQrCode,
