@@ -85,10 +85,11 @@ function createServiceClient() {
 
 // ── Core send function ────────────────────────────────────────────────────────
 
+// Returns: true = sent, false = failed, 'expired' = subscription must be deleted
 async function sendToSubscription(
   subscription: PushSubscriptionRow,
   notification: PushNotification
-): Promise<boolean> {
+): Promise<boolean | 'expired'> {
   try {
     const payload = JSON.stringify({
       title: notification.title,
@@ -118,12 +119,12 @@ async function sendToSubscription(
     );
     return true;
   } catch (err: any) {
-    // 410 Gone = subscription expired, should remove
+    // 410 Gone / 404 = subscription expired — caller must remove from DB
     if (err?.statusCode === 410 || err?.statusCode === 404) {
-      console.warn('[push] Subscription expired, marking for removal:', subscription.endpoint.slice(0, 40));
-    } else {
-      console.error('[push] Send error:', err?.message || err);
+      console.warn('[push] Subscription expired:', subscription.endpoint.slice(0, 50));
+      return 'expired';
     }
+    console.error('[push] Send error:', err?.message || err);
     return false;
   }
 }
@@ -195,12 +196,34 @@ export async function sendPushNotification(
     status: 'pending',
   });
 
-  // Send to all devices
+  // Send to all devices e coletar expiradas
   const results = await Promise.allSettled(
     subscriptions.map((sub) => sendToSubscription(sub, notification))
   );
 
-  const allSent = results.every((r) => r.status === 'fulfilled' && r.value);
+  const expiredEndpoints: string[] = [];
+  let successCount = 0;
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') {
+      if (r.value === 'expired') {
+        expiredEndpoints.push(subscriptions[i].endpoint);
+      } else if (r.value === true) {
+        successCount++;
+      }
+    }
+  });
+
+  // Remover subscriptions expiradas do banco
+  if (expiredEndpoints.length > 0) {
+    await supabase
+      .from('push_subscriptions')
+      .delete()
+      .eq('user_id', userId)
+      .in('endpoint', expiredEndpoints);
+    console.log(`[push] Removed ${expiredEndpoints.length} expired subscriptions for user ${userId}`);
+  }
+
+  const allSent = successCount > 0;
 
   // Update queue status
   await supabase

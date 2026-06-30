@@ -129,23 +129,80 @@ export function useChat() {
     return () => { supabase.removeChannel(ch); channelRef.current = null; };
   }, [selectedId, user]);
 
-  // Send message
+  // Send message — usa /api/messages para push server-side
   const sendMessage = async (content: string, type: 'text' | 'image' = 'text', metadata?: any) => {
     if (!user || !selectedId) return;
-    const msg: any = { conversation_id: selectedId, sender_id: user.id, content, type };
-    if (metadata) msg.metadata = metadata;
-    await supabase.from('messages').insert(msg);
-    await supabase.from('conversations').update({ last_message: content, last_message_at: new Date().toISOString() }).eq('id', selectedId);
+
+    // Tentar via API (dispara push + Realtime)
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: selectedId,
+          sender_id: user.id,
+          content,
+          type,
+          metadata: metadata || null,
+        }),
+      });
+      if (res.ok) return;
+    } catch {
+      // Fallback direto via Supabase se API falhar
+    }
+
+    // Fallback: insert direto
+    await supabase.from('messages').insert({
+      conversation_id: selectedId,
+      sender_id: user.id,
+      content,
+      type,
+      ...(metadata ? { metadata } : {}),
+    });
+    await supabase
+      .from('conversations')
+      .update({ last_message: content, last_message_at: new Date().toISOString() })
+      .eq('id', selectedId);
   };
 
   // Send offer
   const sendOffer = async (amount: number, message: string) => {
     if (!user || !selectedId) return;
+
+    // Tentar via API (dispara push + Realtime)
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: selectedId,
+          sender_id: user.id,
+          content: message,
+          type: 'offer',
+          offer_amount: amount,
+        }),
+      });
+      if (res.ok) return;
+    } catch {
+      // Fallback
+    }
+
+    // Fallback direto
     await supabase.from('messages').insert({
-      conversation_id: selectedId, sender_id: user.id, content: message,
-      type: 'offer', offer_amount: amount, offer_status: 'pending'
+      conversation_id: selectedId,
+      sender_id: user.id,
+      content: message,
+      type: 'offer',
+      offer_amount: amount,
+      offer_status: 'pending',
     });
-    await supabase.from('conversations').update({ last_message: `Oferta: R$ ${amount}`, last_message_at: new Date().toISOString() }).eq('id', selectedId);
+    await supabase
+      .from('conversations')
+      .update({
+        last_message: `Oferta: R$ ${amount}`,
+        last_message_at: new Date().toISOString(),
+      })
+      .eq('id', selectedId);
   };
 
   // Accept/reject offer

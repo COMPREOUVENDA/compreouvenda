@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/escrow-auto-release",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-expired-subscriptions",
+      "schedule": "0 3 * * 0"
+    },
+    {
+      "path": "/api/cron/expire-old-products",
+      "schedule": "0 1 * * *"
     }
   ]
 }

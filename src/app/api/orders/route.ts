@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+// Usar push-notifications.ts: faz DB insert + web-push real
+import {
+  notifyNewOrder as pushNotifyNewOrder,
+  notifyPaymentReceived as pushNotifyPaymentReceived,
+} from '@/lib/push-notifications';
+// Fallback DB-only (quando VAPID não configurado)
 import { notifyNewOrder, notifyPaymentReceived, notifyOrderStatus } from '@/lib/server-notifications';
 
 function getServiceClient() {
@@ -69,20 +75,21 @@ export async function POST(req: NextRequest) {
     const productTitle = (product as any)?.title || 'Produto';
     const buyerName = (buyer as any)?.name || 'Comprador';
 
-    // 3. Notificar vendedor em background (não bloqueia resposta)
+    // 3. Notificar vendedor em background (push real + DB)
     const notifPromises: Promise<void>[] = [
-      notifyNewOrder(seller_id, {
+      // push-notifications: insere no DB + envia web-push se VAPID configurado
+      pushNotifyNewOrder(seller_id, {
         orderId,
-        productTitle,
-        amount,
+        productName: productTitle,
         buyerName,
+        amount,
       }),
     ];
 
     // 4. Se pagamento confirmado imediatamente (cartão), notificar pagamento recebido
     if (payment_method !== 'pix') {
       notifPromises.push(
-        notifyPaymentReceived(seller_id, { orderId, productTitle, amount })
+        pushNotifyPaymentReceived(seller_id, amount, orderId)
       );
     }
 
