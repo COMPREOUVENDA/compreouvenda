@@ -8,45 +8,6 @@ import { PLATFORM_FEE_PERCENT } from '@/lib/constants';
 
 const supabase = createClient();
 
-const MOCK_ORDERS: Order[] = [
-  {
-    id: 'o1',
-    product_id: '1',
-    buyer_id: 'u10',
-    seller_id: 'u1',
-    gross_value: 5200,
-    platform_fee: 520,
-    gateway_fee: 78,
-    reseller_commission_value: 0,
-    donation_value: 80,
-    seller_net_value: 4522,
-    payment_status: 'paid',
-    delivery_type: 'local_pickup',
-    delivery_status: 'delivered',
-    buyer_confirmed: false,
-    seller_confirmed: true,
-    created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-  {
-    id: 'o2',
-    product_id: '3',
-    buyer_id: 'u10',
-    seller_id: 'u3',
-    gross_value: 2800,
-    platform_fee: 280,
-    gateway_fee: 42,
-    reseller_commission_value: 0,
-    donation_value: 50,
-    seller_net_value: 2428,
-    payment_status: 'held',
-    delivery_type: 'partner_delivery',
-    delivery_status: 'in_transit',
-    buyer_confirmed: false,
-    seller_confirmed: false,
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-  },
-];
-
 export function useOrders() {
   const { user } = useAuthStore();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -189,40 +150,58 @@ export function useOrders() {
           : 0;
         const sellerNet = gross - platformFee - gatewayFee - resellerCommission - donationValue;
 
-        const { data: order, error: insertError } = await supabase
-          .from('orders')
-          .insert({
+        // Usar a API route para criar o pedido (garante notificação ao vendedor)
+        const res = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             product_id: productId,
-            buyer_id: user.id,
             seller_id: product.user_id,
-            reseller_id: resellerId || null,
-            gross_value: gross,
-            platform_fee: platformFee,
-            gateway_fee: gatewayFee,
-            reseller_commission_value: resellerCommission,
-            donation_value: donationValue,
-            seller_net_value: sellerNet,
-            payment_status: 'pending',
-            payment_provider: 'simulated',
+            buyer_id: user.id,
+            amount: gross,
             delivery_type: deliveryType,
-            delivery_status: 'pending',
-            buyer_confirmed: false,
-            seller_confirmed: false,
-          })
-          .select()
+            payment_method: paymentMethod,
+          }),
+        });
+
+        if (!res.ok) {
+          // Fallback: inserir diretamente se API falhar
+          const { data: order, error: insertError } = await supabase
+            .from('orders')
+            .insert({
+              product_id: productId,
+              buyer_id: user.id,
+              seller_id: product.user_id,
+              reseller_id: resellerId || null,
+              gross_value: gross,
+              platform_fee: platformFee,
+              gateway_fee: gatewayFee,
+              reseller_commission_value: resellerCommission,
+              donation_value: donationValue,
+              seller_net_value: sellerNet,
+              payment_status: 'pending',
+              payment_provider: 'simulated',
+              delivery_type: deliveryType,
+              delivery_status: 'pending',
+              buyer_confirmed: false,
+              seller_confirmed: false,
+            })
+            .select()
+            .single();
+          if (insertError) throw insertError;
+          return order as Order;
+        }
+
+        const { orderId } = await res.json();
+
+        // Buscar o pedido criado para retornar tipado
+        const { data: order } = await supabase
+          .from('orders')
+          .select('*, product:products(id, title, price, images:product_images(url))')
+          .eq('id', orderId)
           .single();
 
-        if (insertError) throw insertError;
-
-        // Simulate payment approval after 2s
-        setTimeout(async () => {
-          await supabase
-            .from('orders')
-            .update({ payment_status: 'paid' })
-            .eq('id', order.id);
-        }, 2000);
-
-        return order as Order;
+        return (order as unknown as Order) || null;
       } catch (e: any) {
         setError(e.message || 'Erro ao criar pedido');
         return null;
@@ -263,17 +242,6 @@ export function useOrders() {
         .eq('id', orderId)
         .eq('buyer_id', user.id);
 
-      if (error) {
-        // Update mock state
-        setOrders((prev) =>
-          prev.map((o) =>
-            o.id === orderId
-              ? { ...o, delivery_status: 'confirmed', buyer_confirmed: true }
-              : o
-          )
-        );
-        return true;
-      }
       setOrders((prev) =>
         prev.map((o) =>
           o.id === orderId
@@ -281,7 +249,8 @@ export function useOrders() {
             : o
         )
       );
-      return true;
+
+      return !error;
     },
     [user]
   );

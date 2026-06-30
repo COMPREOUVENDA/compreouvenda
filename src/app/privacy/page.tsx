@@ -76,10 +76,10 @@ export default function PrivacyPage() {
                 <strong className="text-white">Razão Social:</strong> CompreOuVenda LTDA
               </p>
               <p>
-                <strong className="text-white">CNPJ:</strong> [placeholder]
+                <strong className="text-white">CNPJ:</strong> Em processo de registro
               </p>
               <p>
-                <strong className="text-white">Endereço:</strong> [placeholder]
+                <strong className="text-white">Endereço:</strong> Brasil
               </p>
               <p>
                 <strong className="text-white">E-mail de contato:</strong>{' '}
