@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'pt_BR',
-    url: 'https://compreouvenda.vercel.app/privacidade',
+    url: 'https://compreouvenda.vercel.app/privacy',
     siteName: 'CompreOuVenda',
     title: 'Política de Privacidade - CompreOuVenda',
     description:
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     images: ['/logo-full.png'],
   },
   alternates: {
-    canonical: 'https://compreouvenda.vercel.app/privacidade',
+    canonical: 'https://compreouvenda.vercel.app/privacy',
   },
 };
 
@@ -104,16 +104,16 @@ export default function PrivacyPage() {
             </p>
             <div className="mt-3 text-gray-300 text-sm md:text-base leading-relaxed space-y-2">
               <p>
-                <strong className="text-white">Nome:</strong> [placeholder nome]
+                <strong className="text-white">Nome:</strong> Encarregado de Dados — CompreOuVenda
               </p>
               <p>
                 <strong className="text-white">E-mail:</strong>{' '}
                 <a
-                  href="mailto:[placeholder email]"
+                  href="mailto:privacidade@compreouvenda.com"
                   className="underline underline-offset-4 hover:text-white transition-colors"
                   style={{ color: '#F5921E' }}
                 >
-                  [placeholder email]
+                  privacidade@compreouvenda.com
                 </a>
               </p>
             </div>
@@ -606,11 +606,11 @@ export default function PrivacyPage() {
               <p>
                 <strong className="text-white">DPO:</strong>{' '}
                 <a
-                  href="mailto:[placeholder email]"
+                  href="mailto:privacidade@compreouvenda.com"
                   className="underline underline-offset-4 hover:text-white transition-colors"
                   style={{ color: '#F5921E' }}
                 >
-                  [placeholder email]
+                  privacidade@compreouvenda.com
                 </a>
               </p>
             </div>

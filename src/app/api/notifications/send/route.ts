@@ -43,11 +43,11 @@ export async function POST(req: NextRequest) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-      // Check admin role
+      // Check admin role — usar auth_id (UUID do auth) não id (UUID interno)
       const { data: profile } = await supabase
         .from('users')
         .select('role')
-        .eq('id', user.id)
+        .eq('auth_id', user.id)
         .single();
 
       if (profile?.role !== 'admin') {

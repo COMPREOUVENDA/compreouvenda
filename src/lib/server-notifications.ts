@@ -7,9 +7,15 @@
 import { createClient } from '@supabase/supabase-js';
 
 function getServiceClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey) {
+    // Sem service role key, operações de INSERT em tabelas protegidas por RLS podem falhar.
+    // Configure SUPABASE_SERVICE_ROLE_KEY no painel Vercel para produção.
+    console.warn('[server-notifications] SUPABASE_SERVICE_ROLE_KEY não definida — usando anon key (RLS pode bloquear inserts)');
+  }
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    serviceKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 }
