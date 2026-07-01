@@ -8,40 +8,6 @@ import type { User, LGPDConsents } from '@/types';
 
 const supabase = createClient();
 
-// ─── Consent record structure for user_consents table ────────────────────────
-
-interface ConsentRecord {
-  user_id: string;
-  subject: 'terms' | 'privacy' | 'geolocation' | 'marketing';
-  purpose: string;
-  legal_basis: string;
-  version: string;
-  granted: boolean;
-  granted_at: string;
-  source: 'registration';
-}
-
-const CONSENT_META: Record<
-  ConsentRecord['subject'],
-  { purpose: string; legal_basis: string }
-> = {
-  terms: {
-    purpose: 'Aceitação dos Termos de Uso da plataforma',
-    legal_basis: 'Execução de contrato (Art. 7°, V – LGPD)',
-  },
-  privacy: {
-    purpose: 'Aceitação da Política de Privacidade',
-    legal_basis: 'Execução de contrato (Art. 7°, V – LGPD)',
-  },
-  geolocation: {
-    purpose: 'Uso da localização geográfica para conectar compradores e vendedores próximos',
-    legal_basis: 'Execução de contrato (Art. 7°, V – LGPD)',
-  },
-  marketing: {
-    purpose: 'Envio de comunicações promocionais por e-mail e push',
-    legal_basis: 'Consentimento do titular (Art. 7°, I – LGPD)',
-  },
-};
 
 export function useAuth() {
   const { user, isLoading, setUser, setLoading } = useAuthStore();
@@ -189,41 +155,24 @@ export function useAuth() {
       // ── Insert LGPD consent records ──────────────────────────────────────
       if (extras.consents) {
         const lgpd = extras.consents;
-        const now = lgpd.timestamp || new Date().toISOString();
-        const version = lgpd.version ?? '1.0';
+        const version = lgpd.version ?? 'v1';
 
-        const consentSubjects: ConsentRecord['subject'][] = [
-          'terms',
-          'privacy',
-          'geolocation',
-          'marketing',
-        ];
-
-        const grantedMap: Record<ConsentRecord['subject'], boolean> = {
-          terms: lgpd.terms_accepted,
-          privacy: lgpd.privacy_accepted,
-          geolocation: lgpd.geolocation_accepted,
-          marketing: lgpd.marketing_accepted,
-        };
-
-        const records: ConsentRecord[] = consentSubjects.map((subject) => ({
-          user_id: data.user!.id,
-          subject,
-          purpose: CONSENT_META[subject].purpose,
-          legal_basis: CONSENT_META[subject].legal_basis,
-          version,
-          granted: grantedMap[subject],
-          granted_at: now,
-          source: 'registration',
-        }));
-
-        // Use upsert so re-registration attempts don't fail on duplicates
+        // Mapeia para o schema real da tabela user_consents:
+        // essential = terms_accepted && privacy_accepted
+        // analytics = false (não coletamos analytics opt-in no cadastro)
+        // marketing = marketing_accepted
         const { error: consentError } = await supabase
           .from('user_consents')
-          .upsert(records, {
-            onConflict: 'user_id,subject',
-            ignoreDuplicates: false,
-          });
+          .upsert(
+            {
+              user_id: data.user!.id,
+              essential: lgpd.terms_accepted && lgpd.privacy_accepted,
+              analytics: false,
+              marketing: lgpd.marketing_accepted ?? false,
+              version,
+            },
+            { onConflict: 'user_id' }
+          );
 
         // Non-blocking: log but don't throw — user account is already created
         if (consentError) {
