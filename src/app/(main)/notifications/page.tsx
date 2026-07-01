@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Bell, BellRing, CheckCheck, Package, CreditCard, MessageCircle, Heart, Star, Video, Megaphone, Gift, ShieldAlert } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 
@@ -15,6 +16,12 @@ const ICON_MAP: Record<string, any> = {
   promotion: Megaphone,
   donation: Gift,
   security: ShieldAlert,
+  // aliases para tipos do notification_queue
+  new_order: Package,
+  new_message: MessageCircle,
+  product_sold: Package,
+  payment_received: CreditCard,
+  review_received: Star,
   default: Bell,
 };
 
@@ -28,28 +35,22 @@ const COLOR_MAP: Record<string, string> = {
   promotion: 'bg-brand-purple/10 text-brand-purple',
   donation: 'bg-emerald-500/10 text-emerald-500',
   security: 'bg-red-500/10 text-red-500',
+  // aliases para tipos do notification_queue
+  new_order: 'bg-brand-blue/10 text-brand-blue',
+  new_message: 'bg-brand-purple/10 text-brand-purple',
+  product_sold: 'bg-emerald-500/10 text-emerald-500',
+  payment_received: 'bg-emerald-500/10 text-emerald-500',
+  review_received: 'bg-brand-gold/10 text-brand-gold',
   default: 'bg-gray-100 text-gray-500',
 };
 
-// Mock notifications for when DB is empty
-const MOCK_NOTIFICATIONS = [
-  { id: '1', type: 'payment', title: 'Pagamento recebido!', body: 'Você recebeu R$ 4.500 pela venda do iPhone 14 Pro', created_at: new Date(Date.now() - 300000).toISOString(), read_at: null },
-  { id: '2', type: 'message', title: 'Nova mensagem', body: 'Maria Santos enviou uma mensagem sobre Sofá Retrátil', created_at: new Date(Date.now() - 3600000).toISOString(), read_at: null },
-  { id: '3', type: 'video', title: 'Vídeo pronto! 🎬', body: 'O vídeo do seu produto "Bicicleta Speed" ficou pronto', created_at: new Date(Date.now() - 7200000).toISOString(), read_at: new Date().toISOString() },
-  { id: '4', type: 'order', title: 'Novo pedido', body: 'João Silva comprou seu produto "MacBook Air M2"', created_at: new Date(Date.now() - 14400000).toISOString(), read_at: new Date().toISOString() },
-  { id: '5', type: 'favorite', title: 'Produto favoritado ❤️', body: '3 pessoas adicionaram seu produto aos favoritos', created_at: new Date(Date.now() - 28800000).toISOString(), read_at: new Date().toISOString() },
-  { id: '6', type: 'promotion', title: 'Campanha ativa', body: 'Seu anúncio patrocinado já recebeu 234 impressões', created_at: new Date(Date.now() - 43200000).toISOString(), read_at: new Date().toISOString() },
-  { id: '7', type: 'donation', title: 'Doação realizada 💚', body: 'R$ 90 foram doados à AACD pela sua venda', created_at: new Date(Date.now() - 86400000).toISOString(), read_at: new Date().toISOString() },
-];
-
 export default function NotificationsPage() {
+  const router = useRouter();
   const { notifications, unreadCount, pushEnabled, enablePush, markAsRead, markAllRead, loadNotifications } = useNotifications();
 
   useEffect(() => {
     loadNotifications();
   }, [loadNotifications]);
-
-  const displayNotifs = notifications;
 
   const formatTime = (date: string) => {
     const diff = Date.now() - new Date(date).getTime();
@@ -102,15 +103,19 @@ export default function NotificationsPage() {
 
       {/* Notifications List */}
       <div className="space-y-2">
-        {displayNotifs.map((notif) => {
+        {notifications.map((notif) => {
           const Icon = ICON_MAP[notif.type] || ICON_MAP.default;
           const colorClass = COLOR_MAP[notif.type] || COLOR_MAP.default;
           const isUnread = !notif.read_at;
+          const url = (notif as any).data?.url || '/notifications';
 
           return (
             <button
               key={notif.id}
-              onClick={() => isUnread && markAsRead(notif.id)}
+              onClick={() => {
+                if (isUnread) markAsRead(notif.id);
+                if (url !== '/notifications') router.push(url);
+              }}
               className={`w-full flex items-start gap-3 p-4 rounded-2xl transition-all text-left ${
                 isUnread ? 'bg-brand-purple/5 border border-brand-purple/10' : 'bg-white border border-gray-100 hover:bg-gray-50'
               }`}
@@ -131,12 +136,14 @@ export default function NotificationsPage() {
         })}
       </div>
 
-      {displayNotifs.length === 0 && (
+      {notifications.length === 0 && (
         <div className="text-center py-16">
           <Bell className="w-12 h-12 text-gray-200 mx-auto mb-3" />
           <p className="text-gray-400">Nenhuma notificação ainda</p>
+          <p className="text-xs text-gray-300 mt-1">Suas notificações aparecerão aqui</p>
         </div>
       )}
     </div>
   );
 }
+

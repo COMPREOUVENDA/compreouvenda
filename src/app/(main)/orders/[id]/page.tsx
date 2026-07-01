@@ -2,17 +2,20 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { createClient } from '@/lib/supabase/client';
 import {
   ArrowLeft, Package, User, MapPin, CreditCard,
   Truck, CheckCircle2, AlertTriangle, Loader2,
   ReceiptText, ShieldCheck,
 } from 'lucide-react';
-import EscrowStatusTracker from '@/components/escrow/EscrowStatusTracker';
-import QRScanner from '@/components/escrow/QRScanner';
-import DisputeForm from '@/components/escrow/DisputeForm';
-import EscrowQRDisplay from '@/components/escrow/EscrowQRDisplay';
 import type { EscrowStatus } from '@/lib/escrow';
+
+// Dynamic imports para reduzir o bundle inicial da página (eram ~40kB estáticos)
+const EscrowStatusTracker = dynamic(() => import('@/components/escrow/EscrowStatusTracker'), { ssr: false });
+const QRScanner           = dynamic(() => import('@/components/escrow/QRScanner'),           { ssr: false });
+const DisputeForm         = dynamic(() => import('@/components/escrow/DisputeForm'),          { ssr: false });
+const EscrowQRDisplay     = dynamic(() => import('@/components/escrow/EscrowQRDisplay'),      { ssr: false });
 
 interface OrderDetail {
   id: string;

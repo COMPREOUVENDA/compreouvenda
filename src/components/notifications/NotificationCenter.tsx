@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Bell, BellOff, Check, CheckCheck, ExternalLink, Package, MessageCircle,
          DollarSign, Star, ShoppingBag, Zap, Settings, X } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -36,6 +37,7 @@ export default function NotificationCenter() {
   const { notifications, unreadCount, markAsRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // Close on outside click
   useEffect(() => {
@@ -143,6 +145,8 @@ export default function NotificationCenter() {
                                 ${isUnread ? 'bg-purple-50/40' : ''}`}
                     onClick={() => {
                       if (isUnread) markAsRead(notif.id);
+                      setOpen(false);
+                      router.push(url);
                     }}
                   >
                     <div className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center ${colorClass}`}>
