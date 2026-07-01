@@ -8,6 +8,7 @@ import PushPermissionBanner from '@/components/notifications/PushPermissionBanne
 import { Analytics } from '@/components/Analytics';
 import { Chatbot } from '@/components/chat/Chatbot';
 import { ToastProvider } from '@/components/ui/Toast';
+import AuthInitializer from '@/components/auth/AuthInitializer';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,6 +85,8 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen">
         <Analytics />
+        {/* Inicializa sessão Supabase globalmente (hidrata authStore em todas as rotas) */}
+        <AuthInitializer />
         {/* Skip to main content for accessibility */}
         <a
           href="#main-content"
