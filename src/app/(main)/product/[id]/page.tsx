@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
-  ArrowLeft, Heart, Share2, MapPin, MessageCircle, Eye, Star, Users,
+  ArrowLeft, Heart, Share2, MapPin, MessageCircle, Eye, Star, Users, Pencil,
   HandHeart, Play, ChevronLeft, ChevronRight, Gavel, Zap, Clock,
   ShieldCheck, Loader2, ShoppingCart,
 } from 'lucide-react';
@@ -236,6 +236,16 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               <ArrowLeft className="w-5 h-5 text-white" />
             </Link>
             <div className="flex gap-2">
+              {/* Botão editar — visível apenas para o dono do produto */}
+              {user && product && user.id === product.user_id && (
+                <Link
+                  href={`/product/${product.id}/edit`}
+                  className="bg-black/30 backdrop-blur-sm rounded-full p-2"
+                  title="Editar anúncio"
+                >
+                  <Pencil className="w-5 h-5 text-white" />
+                </Link>
+              )}
               <button
                 onClick={() => toggleFavorite(product.id)}
                 className="bg-black/30 backdrop-blur-sm rounded-full p-2"

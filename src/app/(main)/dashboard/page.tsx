@@ -810,12 +810,24 @@ export default function DashboardPage() {
               {userListings.map((p) => (
                 <div key={p.id} className="relative group">
                   <ProductCard product={p} style="card" />
-                  <button
-                    onClick={() => setBoostProduct({ id: p.id, title: p.title })}
-                    className="absolute bottom-2 left-2 right-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 text-xs font-bold py-1.5 rounded-xl flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                  >
-                    <Zap className="w-3 h-3" /> Impulsionar
-                  </button>
+                  {/* Ações rápidas no hover */}
+                  <div className="absolute inset-0 rounded-2xl flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto">
+                    <div className="flex justify-end p-2">
+                      <Link
+                        href={`/product/${p.id}/edit`}
+                        className="bg-white/90 backdrop-blur-sm rounded-xl p-1.5 shadow-sm"
+                        title="Editar anúncio"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-brand-purple" />
+                      </Link>
+                    </div>
+                    <button
+                      onClick={() => setBoostProduct({ id: p.id, title: p.title })}
+                      className="mx-2 mb-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 text-xs font-bold py-1.5 rounded-xl flex items-center justify-center gap-1 shadow-lg"
+                    >
+                      <Zap className="w-3 h-3" /> Impulsionar
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
