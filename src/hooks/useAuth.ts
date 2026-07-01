@@ -114,7 +114,10 @@ export function useAuth() {
     }
   ) => {
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({
+
+    // Timeout de 20s: evita spinner infinito caso o Supabase esteja com rate limit
+    // ou o serviço demore a responder (ex.: cold start, rede instável)
+    const signUpPromise = supabase.auth.signUp({
       email,
       password,
       options: {
@@ -128,6 +131,15 @@ export function useAuth() {
         },
       },
     });
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('Tempo esgotado. Tente novamente em alguns instantes.')),
+        20_000
+      )
+    );
+
+    const { data, error } = await (Promise.race([signUpPromise, timeoutPromise]) as ReturnType<typeof supabase.auth.signUp>);
 
     if (error) {
       setLoading(false);
