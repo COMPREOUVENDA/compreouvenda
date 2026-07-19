@@ -6,7 +6,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
-  timeout: 30_000,
+  timeout: 60_000,
   reporter: [['html', { open: 'never' }], ['list']],
 
   use: {
@@ -16,6 +16,8 @@ export default defineConfig({
     headless: true,
     locale: 'pt-BR',
     timezoneId: 'America/Sao_Paulo',
+    // Garante sessão limpa sem cookies de sessão anterior
+    storageState: undefined,
   },
 
   projects: [

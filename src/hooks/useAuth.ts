@@ -202,7 +202,7 @@ export function useAuth() {
 
     // Profile is auto-created by the trigger handle_new_user()
     // Also update extra fields in case the trigger doesn't copy them
-    if (data.user && extras) {
+    if (data?.user && extras) {
       const updatePayload: Record<string, string | number> = {};
       if (extras.phone) updatePayload.phone = extras.phone;
       if (extras.document) updatePayload.document = extras.document;
@@ -247,7 +247,7 @@ export function useAuth() {
       }
     }
 
-    if (data.user) {
+    if (data?.user) {
       await loadProfile(data.user.id);
     }
     setLoading(false);
