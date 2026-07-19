@@ -1,33 +1,36 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import crypto from 'crypto'
-
-function generateSecret() {
-  const buffer = crypto.randomBytes(20)
-  const base32chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
-  let secret = ''
-  for (let i = 0; i < buffer.length; i++) {
-    secret += base32chars[buffer[i] % 32]
-  }
-  return secret
-}
-
-function generateQRCodeURL(secret: string, email: string) {
-  const issuer = 'CompreOuVenda'
-  const otpauth = `otpauth://totp/${issuer}:${email}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`
-  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauth)}`
-}
+import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { generateBase32Secret, getOtpAuthUrl } from '@/lib/totp';
+import crypto from 'crypto';
 
 export async function POST() {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
   if (!user) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
   }
 
-  const secret = generateSecret()
-  const qrCode = generateQRCodeURL(secret, user.email || '')
+  const secret = generateBase32Secret();
+  const qrCode = getOtpAuthUrl(user.email || '', secret);
+  const backupCodes = Array.from({ length: 8 }, () =
+>    crypto.randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()
+  );
 
-  return NextResponse.json({ secret, qrCode })
+  // Salva secret e backup codes (não habilita ainda — só após verificação)
+  const { error } = await supabase
+    .from('user_2fa')
+    .upsert({
+      user_id: user.id,
+      secret,
+      backup_codes: backupCodes,
+      enabled: false,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ secret, qrCode, backupCodes });
 }
