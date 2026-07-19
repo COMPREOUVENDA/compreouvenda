@@ -7,8 +7,14 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
-const PROJECT_REF = 'auxaajrjwbdsnxtvgmsb';
-const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1eGFhanJqd2Jkc254dHZnbXNiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzI0MjEzMywiZXhwIjoyMDkyODE4MTMzfQ.CX_0c-PgeTKZ9V6fVALULIA_KDidTec3TeEeiOf_jJY';
+const PROJECT_REF = process.env.NEXT_PUBLIC_SUPABASE_REF || 'auxaajrjwbdsnxtvgmsb';
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SERVICE_ROLE_KEY) {
+  console.error('Erro: SUPABASE_SERVICE_ROLE_KEY não está definida no ambiente.');
+  console.error('Use: set SUPABASE_SERVICE_ROLE_KEY=\'<sua-chave\'"'"' antes de executar este script.');
+  process.exit(1);
+}
 
 // Uses Supabase's internal pg endpoint for service_role
 // POST https://<ref>.supabase.co/rest/v1/rpc/<func> -- not available for raw SQL
