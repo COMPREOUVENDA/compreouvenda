@@ -258,7 +258,7 @@ export default function EditProductPage() {
             <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="input-field w-full">
               <option value="">Selecionar categoria</option>
               {CATEGORIES.filter(c => c.id !== 'all').map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.label}</option>
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
           </div>
