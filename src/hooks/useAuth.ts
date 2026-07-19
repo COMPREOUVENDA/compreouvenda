@@ -133,13 +133,67 @@ export function useAuth() {
     });
 
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error('Tempo esgotado. Tente novamente em alguns instantes.')),
-        20_000
-      )
+      setTimeout(() => reject(new Error('timeout')), 20_000)
     );
 
-    const { data, error } = await (Promise.race([signUpPromise, timeoutPromise]) as ReturnType<typeof supabase.auth.signUp>);
+    let data: Awaited<ReturnType<typeof supabase.auth.signUp>>['data'] | null = null;
+    let error: Error | null = null;
+
+    try {
+      const result = await (Promise.race([signUpPromise, timeoutPromise]) as ReturnType<
+        typeof supabase.auth.signUp
+      >);
+      data = result.data;
+      error = result.error;
+    } catch (err) {
+      error = err instanceof Error ? err : new Error('Tempo esgotado.');
+    }
+
+    // Fallback server-side: bypassa rate limit de email do Supabase Free
+    if (
+      (error && error.message === 'timeout') ||
+      process.env.NEXT_PUBLIC_ENABLE_SERVER_SIGNUP === 'true'
+    ) {
+      try {
+        const res = await fetch('/api/auth/signup-bypass', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            password,
+            name,
+            type,
+            phone: extras?.phone,
+            document: extras?.document,
+            city: extras?.city,
+            state: extras?.state,
+          }),
+        });
+
+        const json = await res.json().catch(() => ({ error: 'Resposta inválida do servidor.' }));
+
+        if (res.ok && json.session?.access_token) {
+          const { error: setSessionError } = await supabase.auth.setSession({
+            access_token: json.session.access_token,
+            refresh_token: json.session.refresh_token,
+          });
+
+          if (!setSessionError) {
+            const { data: userData } = await supabase.auth.getUser();
+            if (userData.user) await loadProfile(userData.user.id);
+            setLoading(false);
+            return;
+          }
+        }
+
+        throw new Error(json.error || 'Erro ao criar conta. Tente novamente.');
+      } catch (bypassErr) {
+        setLoading(false);
+        throw bypassErr instanceof Error
+          ? bypassErr
+          : new Error('Erro ao criar conta. Tente novamente.');
+      }
+    }
 
     if (error) {
       setLoading(false);
