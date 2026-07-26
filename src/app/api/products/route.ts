@@ -50,32 +50,37 @@ export async function POST(req: NextRequest) {
     let profile = profileRows?.[0];
 
     if (!profile) {
-      // Fallback: cria perfil com cliente anon autenticado do usuário,
+      // Fallback: cria perfil via REST do Supabase autenticado do usuário,
       // pois a service role key no ambiente pode não estar bypassando RLS.
-      const userClient = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-          auth: { autoRefreshToken: false, persistSession: false },
-        }
-      );
-      await userClient.auth.setSession({ access_token: token, refresh_token: '' });
       const name =
         userData.user.user_metadata?.name ||
         userData.user.email?.split('@')[0] ||
         'Usuário';
       const type = userData.user.user_metadata?.type || 'buyer';
-      const { data: inserted, error: insertErr } = await userClient
-        .from('users')
-        .insert({ auth_id: userData.user.id, email: userData.user.email, name, type })
-        .select('id');
-      if (insertErr) {
-        console.error('[products] auto-create profile error:', insertErr);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/users`, {
+        method: 'POST',
+        headers: {
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+        },
+        body: JSON.stringify({
+          auth_id: userData.user.id,
+          email: userData.user.email,
+          name,
+          type,
+        }),
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('[products] auto-create profile error:', res.status, errText);
         return NextResponse.json(
-          { error: 'Perfil não encontrado.', detail: insertErr.message, code: insertErr.code },
+          { error: 'Perfil não encontrado.', detail: errText, status: res.status },
           { status: 404 }
         );
       }
+      const inserted = await res.json();
       profile = inserted?.[0];
     }
 
