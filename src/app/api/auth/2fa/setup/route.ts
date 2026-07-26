@@ -13,8 +13,8 @@ export async function POST() {
 
   const secret = generateBase32Secret();
   const qrCode = getOtpAuthUrl(user.email || '', secret);
-  const backupCodes = Array.from({ length: 8 }, () =
->    crypto.randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()
+  const backupCodes = Array.from({ length: 8 }, () =>
+    crypto.randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()
   );
 
   // Salva secret e backup codes (não habilita ainda — só após verificação)
