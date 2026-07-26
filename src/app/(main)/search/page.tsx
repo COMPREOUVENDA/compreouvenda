@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, SlidersHorizontal, X, LayoutGrid, List, ChevronDown } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { CATEGORIES } from '@/lib/constants';
+import { useCategories } from '@/hooks/useCategories';
 import { formatPrice, conditionLabels } from '@/lib/utils';
 import { track } from '@/lib/analytics';
 import ProductCard from '@/components/product/ProductCard';
@@ -51,6 +51,7 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'feed'>('grid');
+  const { categories } = useCategories();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const applySearch = useCallback(async (q: string, f: Filters) => {
@@ -205,7 +206,7 @@ export default function SearchPage() {
                 className="input-field appearance-none w-full pr-8"
               >
                 <option value="">Todas as categorias</option>
-                {CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <option key={cat.id} value={cat.id}>
                     {cat.icon} {cat.name}
                   </option>

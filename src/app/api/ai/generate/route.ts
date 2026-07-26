@@ -1,7 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { CATEGORIES } from '@/lib/constants';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
+
+interface Category { id: string; name: string; slug: string; icon?: string; }
+let cachedCategories: Category[] | null = null;
+let cachedAt = 0;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+
+async function getCategories(supabase: ReturnType<typeof createClient>): Promise<Category[]> {
+  if (cachedCategories && Date.now() - cachedAt < CACHE_TTL_MS) return cachedCategories;
+  const { data, error } = await supabase
+    .from('categories')
+    .select('id, name, slug, icon')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+  if (error) return cachedCategories || [];
+  cachedCategories = (data as Category[]) || [];
+  cachedAt = Date.now();
+  return cachedCategories;
+}
 
 const descricoesCondicao: Record<string, string> = {
   new: 'novo, sem uso, na embalagem original',
@@ -23,9 +40,10 @@ function gerarTitulo(params: {
   hint: string;
   category: string;
   condition: string;
+  categories: Category[];
 }): string {
-  const { hint, category, condition } = params;
-  const cat = CATEGORIES.find((c) => c.id === category);
+  const { hint, category, condition, categories } = params;
+  const cat = categories.find((c) => c.id === category);
   const nomeCategoria = cat?.name ?? 'Produto';
   const rotuloCondicao = rotulosCondicao[condition] ?? '';
 
@@ -60,9 +78,10 @@ function gerarDescricao(params: {
   category: string;
   condition: string;
   price: number;
+  categories: Category[];
 }): string {
-  const { title, category, condition, price } = params;
-  const cat = CATEGORIES.find((c) => c.id === category);
+  const { title, category, condition, price, categories } = params;
+  const cat = categories.find((c) => c.id === category);
   const nomeCategoria = cat?.name ?? 'produto';
   const descCondicao = descricoesCondicao[condition] ?? 'usado';
   const precoFormatado =
@@ -98,6 +117,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const supabase = createClient();
+    const categories = await getCategories(supabase);
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -127,17 +147,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (type === 'title') {
-      const titulo = gerarTitulo({ hint, category, condition });
+      const titulo = gerarTitulo({ hint, category, condition, categories });
       return NextResponse.json({ success: true, result: titulo });
     }
 
     if (type === 'description') {
-      const tituloBase = hint || gerarTitulo({ hint, category, condition });
+      const tituloBase = hint || gerarTitulo({ hint, category, condition, categories });
       const descricao = gerarDescricao({
         title: tituloBase,
         category,
         condition,
         price: Number(price),
+        categories,
       });
       return NextResponse.json({ success: true, result: descricao });
     }

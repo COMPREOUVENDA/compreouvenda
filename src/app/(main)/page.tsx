@@ -6,8 +6,8 @@ import Link from 'next/link';
 import { Search, SlidersHorizontal, Sparkles, Loader2 } from 'lucide-react';
 import ProductCard from '@/components/product/ProductCard';
 import { ProductCardSkeleton } from '@/components/product/ProductCardSkeleton';
-import { CATEGORIES } from '@/lib/constants';
 import { useProducts } from '@/hooks/useProducts';
+import { useCategories } from '@/hooks/useCategories';
 import HeroCTA from '@/components/home/HeroCTA';
 import FilterDrawer, { DEFAULT_FEED_FILTERS } from '@/components/feed/FilterDrawer';
 import { track } from '@/lib/analytics';
@@ -29,6 +29,7 @@ export default function HomePage() {
   const [showFilters, setShowFilters] = useState(false);
   const [feedFilters, setFeedFilters] = useState<FeedFilters>(DEFAULT_FEED_FILTERS);
   const { products, loading, loadingMore, hasMore, fetchProducts, loadMore, searchProducts } = useProducts();
+  const { categories } = useCategories();
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -173,7 +174,7 @@ export default function HomePage() {
           >
             Todos
           </button>
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id === selectedCategory ? null : cat.id)}
@@ -195,7 +196,7 @@ export default function HomePage() {
         <div>
           <h2 className="font-display font-bold text-lg text-gray-900">
             {selectedCategory
-              ? CATEGORIES.find((c) => c.id === selectedCategory)?.name || 'Produtos'
+              ? categories.find((c) => c.id === selectedCategory)?.name || 'Produtos'
               : 'Perto de você'}
           </h2>
           {hasActiveFilters && (

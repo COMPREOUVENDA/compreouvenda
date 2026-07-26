@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { Heart, Loader2, SlidersHorizontal, X, Search, Trash2 } from 'lucide-react';
 import { useFavorites } from '@/hooks/useFavorites';
 import ProductCard from '@/components/product/ProductCard';
-import { CATEGORIES } from '@/lib/constants';
+import { useCategories } from '@/hooks/useCategories';
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc';
 
 export default function FavoritesPage() {
   const { favorites, loading, removeFavorite } = useFavorites();
+  const { categories } = useCategories();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [sort, setSort] = useState<SortOption>('newest');
   const [search, setSearch] = useState('');
@@ -134,7 +135,7 @@ export default function FavoritesPage() {
                   Todos
                 </button>
                 {activeCategoryIds.map((catId) => {
-                  const cat = CATEGORIES.find((c) => c.id === catId);
+                  const cat = categories.find((c) => c.id === catId);
                   if (!cat) return null;
                   return (
                     <button

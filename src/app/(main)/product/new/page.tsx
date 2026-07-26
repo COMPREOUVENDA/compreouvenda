@@ -9,8 +9,9 @@ import {
   MapPin, Upload, Loader2, CheckCircle, Video, Wand2, Tag, FileText,
   DollarSign,
 } from 'lucide-react';
-import { CATEGORIES, PHOTO_LABELS } from '@/lib/constants';
+import { PHOTO_LABELS } from '@/lib/constants';
 import { useProducts } from '@/hooks/useProducts';
+import { useCategories } from '@/hooks/useCategories';
 import type { PriceSuggestion } from '@/lib/ai-pricing';
 import { getMarketPosition } from '@/lib/ai-pricing';
 import PriceSuggestionCard from '@/components/ai/PriceSuggestionCard';
@@ -118,6 +119,7 @@ export default function NewProductPage() {
   const [locationState, setLocationState] = useState('');
 
   const { createProduct } = useProducts();
+  const { categories } = useCategories();
   const router = useRouter();
 
   // Try to get geolocation on mount
@@ -571,7 +573,7 @@ export default function NewProductPage() {
                     className="input-field appearance-none pr-10"
                   >
                     <option value="">Selecione</option>
-                    {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+                    {categories.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
@@ -808,7 +810,7 @@ export default function NewProductPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 text-sm truncate">{title || 'Sem título'}</p>
                   <p className="text-brand-purple font-bold text-lg">R$ {price || '0,00'}</p>
-                  <p className="text-xs text-gray-400">{filledCount} foto{filledCount !== 1 ? 's' : ''} · {CATEGORIES.find(c => c.id === categoryId)?.name || 'Sem categoria'}</p>
+                  <p className="text-xs text-gray-400">{filledCount} foto{filledCount !== 1 ? 's' : ''} · {categories.find(c => c.id === categoryId)?.name || 'Sem categoria'}</p>
                 </div>
               </div>
 

@@ -33,6 +33,9 @@ export interface Category {
   name: string;
   icon: string;
   slug: string;
+  sort_order?: number;
+  is_active?: boolean;
+  parent_id?: string;
 }
 
 export interface Product {

@@ -7,8 +7,8 @@ import {
   ArrowLeft, Sparkles, Loader2, CheckCircle, X, Save,
   DollarSign, FileText, Tag, ToggleLeft, ToggleRight,
 } from 'lucide-react';
-import { CATEGORIES } from '@/lib/constants';
 import { useProducts } from '@/hooks/useProducts';
+import { useCategories } from '@/hooks/useCategories';
 import { useAuthStore } from '@/stores/authStore';
 import { createClient } from '@/lib/supabase/client';
 import type { Product } from '@/types';
@@ -35,6 +35,7 @@ export default function EditProductPage() {
   const router = useRouter();
   const { user } = useAuthStore();
   const { updateProduct } = useProducts();
+  const { categories } = useCategories();
 
   // Estado do produto
   const [product, setProduct] = useState<Product | null>(null);
@@ -257,7 +258,7 @@ export default function EditProductPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
             <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="input-field w-full">
               <option value="">Selecionar categoria</option>
-              {CATEGORIES.filter(c => c.id !== 'all').map(cat => (
+              {categories.filter(c => c.id !== 'all').map(cat => (
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>

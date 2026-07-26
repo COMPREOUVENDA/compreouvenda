@@ -1,6 +1,5 @@
 import { MetadataRoute } from 'next';
 import { createClient } from '@supabase/supabase-js';
-import { CATEGORIES } from '@/lib/constants';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://compreouvenda.vercel.app';
 
@@ -27,13 +26,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/prohibited-products`,   lastModified: now, changeFrequency: 'yearly',  priority: 0.2 },
   ];
 
-  // Páginas de categoria (uma por categoria + buscas comuns por cidade)
-  const categoryPages: MetadataRoute.Sitemap = CATEGORIES.map((cat) => ({
-    url: `${BASE_URL}/search?category=${cat.slug}`,
-    lastModified: now,
-    changeFrequency: 'daily' as const,
-    priority: 0.8,
-  }));
+  // Páginas de categoria (busca do banco)
+  let categoryPages: MetadataRoute.Sitemap = [];
 
   // Páginas de busca por cidades populares
   const popularCities = [
@@ -56,6 +50,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
+
+    // Categorias ativas do banco
+    const { data: categories } = await supabase
+      .from('categories')
+      .select('slug, updated_at')
+      .eq('is_active', true);
+
+    if (categories) {
+      categoryPages = categories.map((cat) => ({
+        url: `${BASE_URL}/search?category=${cat.slug}`,
+        lastModified: cat.updated_at || now,
+        changeFrequency: 'daily' as const,
+        priority: 0.8,
+      }));
+    }
 
     // Produtos ativos — prioridade por destaque e recentes
     const { data: products } = await supabase
