@@ -57,9 +57,9 @@ export async function POST(req: NextRequest) {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         {
           auth: { autoRefreshToken: false, persistSession: false },
-          global: { headers: { Authorization: `Bearer ${token}` } },
         }
       );
+      await userClient.auth.setSession({ access_token: token, refresh_token: '' });
       const name =
         userData.user.user_metadata?.name ||
         userData.user.email?.split('@')[0] ||
