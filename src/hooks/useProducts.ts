@@ -54,42 +54,16 @@ export function useProducts() {
   const pageRef = useRef(0);
   const filtersRef = useRef<{ categoryId?: string; search?: string; feedFilters?: FeedFilters }>({});
 
-  const buildQuery = useCallback((categoryId?: string, search?: string, feedFilters?: FeedFilters, offset = 0) => {
-    let q = supabase
-      .from('products')
-      .select(FEED_SELECT)
-      .eq('status', 'active');
+  const buildQuery = useCallback(async (categoryId?: string, search?: string, feedFilters?: FeedFilters, offset = 0) => {
+    const params = new URLSearchParams();
+    params.set('page', String(Math.floor(offset / PAGE_SIZE)));
+    params.set('pageSize', String(PAGE_SIZE));
+    if (categoryId) params.set('category_id', categoryId);
+    if (search) params.set('search', search);
 
-    if (categoryId) q = q.eq('category_id', categoryId);
-
-    if (search) {
-      q = q.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
-    }
-
-    if (feedFilters) {
-      if (feedFilters.priceMin) q = q.gte('price', parseFloat(feedFilters.priceMin));
-      if (feedFilters.priceMax) q = q.lte('price', parseFloat(feedFilters.priceMax));
-      if (feedFilters.conditions.length > 0) q = q.in('condition', feedFilters.conditions);
-      if (feedFilters.onlyFeatured) q = q.eq('is_featured', true);
-
-      switch (feedFilters.sort) {
-        case 'price_asc':
-          q = q.order('price', { ascending: true });
-          break;
-        case 'price_desc':
-          q = q.order('price', { ascending: false });
-          break;
-        case 'popular':
-          q = q.order('views_count', { ascending: false });
-          break;
-        default:
-          q = q.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
-      }
-    } else {
-      q = q.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
-    }
-
-    return q.range(offset, offset + PAGE_SIZE - 1);
+    const res = await fetch(`/api/products?${params.toString()}`);
+    if (!res.ok) throw new Error((await res.json()).error || 'Erro ao buscar produtos');
+    return res.json() as Promise<{ products: Product[]; hasMore: boolean }>;
   }, []);
 
   const fetchProducts = useCallback(async (categoryId?: string, search?: string, feedFilters?: FeedFilters) => {
@@ -99,18 +73,10 @@ export function useProducts() {
     filtersRef.current = { categoryId, search, feedFilters };
 
     try {
-      const { data, error: fetchError } = await buildQuery(categoryId, search, feedFilters, 0);
-
-      if (fetchError) {
-        console.warn('Supabase fetch failed:', fetchError.message);
-        setProducts([]);
-        setHasMore(false);
-      } else {
-        const list = (data as unknown as Product[]) || [];
-        setProducts(list);
-        setHasMore(list.length === PAGE_SIZE);
-        pageRef.current = 1;
-      }
+      const { products: list, hasMore } = await buildQuery(categoryId, search, feedFilters, 0);
+      setProducts(list || []);
+      setHasMore(hasMore);
+      pageRef.current = 1;
     } catch (e: any) {
       console.warn('Products fetch error:', e.message);
       setProducts([]);
@@ -128,16 +94,10 @@ export function useProducts() {
     const offset = pageRef.current * PAGE_SIZE;
 
     try {
-      const { data, error: fetchError } = await buildQuery(categoryId, search, feedFilters, offset);
-
-      if (!fetchError && data) {
-        const newItems = data as unknown as Product[];
-        setProducts((prev) => [...prev, ...newItems]);
-        setHasMore(newItems.length === PAGE_SIZE);
-        pageRef.current += 1;
-      } else {
-        setHasMore(false);
-      }
+      const { products: newItems, hasMore: more } = await buildQuery(categoryId, search, feedFilters, offset);
+      setProducts((prev) => [...prev, ...newItems]);
+      setHasMore(more);
+      pageRef.current += 1;
     } catch {
       setHasMore(false);
     } finally {
