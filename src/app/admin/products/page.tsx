@@ -14,14 +14,6 @@ interface ProductRow {
   user?: { name: string } | null;
 }
 
-const MOCK_PRODUCTS: ProductRow[] = [
-  { id: '1', title: 'iPhone 14 Pro Max', price: 5200, status: 'active', created_at: '2024-04-20', user: { name: 'Maria Santos' } },
-  { id: '2', title: 'Sofá Retrátil 3 Lugares', price: 1800, status: 'active', created_at: '2024-04-19', user: { name: 'João Silva' } },
-  { id: '3', title: 'Bicicleta Speed Caloi', price: 2800, status: 'active', created_at: '2024-04-18', user: { name: 'Ana Oliveira' } },
-  { id: '4', title: 'PS5 + 2 Controles', price: 3400, status: 'paused', created_at: '2024-04-17', user: { name: 'Pedro Costa' } },
-  { id: '5', title: 'MacBook Air M2', price: 7500, status: 'sold', created_at: '2024-04-16', user: { name: 'Lucas Ferreira' } },
-];
-
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,9 +38,9 @@ export default function AdminProductsPage() {
         .order('created_at', { ascending: false })
         .limit(100);
 
-      setProducts(data && data.length > 0 ? data as unknown as ProductRow[] : MOCK_PRODUCTS);
+      setProducts(data && data.length > 0 ? data as unknown as ProductRow[] : []);
     } catch {
-      setProducts(MOCK_PRODUCTS);
+      setProducts([]);
     } finally {
       setLoading(false);
     }

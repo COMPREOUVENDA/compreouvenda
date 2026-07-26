@@ -56,12 +56,7 @@ export default function AdminGuard({ children }: AdminGuardProps) {
           return;
         }
 
-        // Hardcoded admin email fallback
-        if (user.email === 'teste@compreouvenda.com') {
-          setStatus('authorized');
-        } else {
-          setStatus('denied');
-        }
+        setStatus('denied');
       } catch {
         router.replace('/admin/login');
       }

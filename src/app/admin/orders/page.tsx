@@ -30,13 +30,6 @@ const STATUS_MAP: Record<OrderStatus, { label: string; color: string }> = {
   failed:   { label: 'Falhou',      color: 'bg-red-500/10 text-red-400' },
 };
 
-const MOCK_ORDERS: Order[] = [
-  { id: '1', buyer_id: '', seller_id: '', product_id: '', gross_value: 5200, payment_status: 'released', delivery_status: 'delivered', created_at: '2024-04-20', buyer: { name: 'Ana Oliveira', email: 'ana@email.com' }, seller: { name: 'Maria Santos' }, product: { title: 'iPhone 14 Pro Max' } },
-  { id: '2', buyer_id: '', seller_id: '', product_id: '', gross_value: 1800, payment_status: 'held',     delivery_status: 'in_transit', created_at: '2024-04-19', buyer: { name: 'Carlos Lima',   email: 'carlos@email.com' }, seller: { name: 'João Silva' }, product: { title: 'Sofá Retrátil' } },
-  { id: '3', buyer_id: '', seller_id: '', product_id: '', gross_value: 3400, payment_status: 'paid',     delivery_status: 'pending',    created_at: '2024-04-19', buyer: { name: 'Fernanda',      email: 'fer@email.com' }, seller: { name: 'Pedro Costa' }, product: { title: 'PS5 + 2 Controles' } },
-  { id: '4', buyer_id: '', seller_id: '', product_id: '', gross_value: 7500, payment_status: 'disputed', delivery_status: 'delivered',  created_at: '2024-04-18', buyer: { name: 'Bruno',         email: 'bruno@email.com' }, seller: { name: 'Lucas' }, product: { title: 'MacBook Air M2' } },
-  { id: '5', buyer_id: '', seller_id: '', product_id: '', gross_value: 2800, payment_status: 'pending',  delivery_status: 'pending',    created_at: '2024-04-18', buyer: { name: 'Julia',         email: 'julia@email.com' }, seller: { name: 'Ana Oliveira' }, product: { title: 'Bicicleta Speed' } },
-];
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -64,10 +57,10 @@ export default function AdminOrdersPage() {
       if (data && data.length > 0) {
         setOrders(data as unknown as Order[]);
       } else {
-        setOrders(MOCK_ORDERS);
+        setOrders([]);
       }
     } catch {
-      setOrders(MOCK_ORDERS);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
