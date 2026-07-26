@@ -102,15 +102,37 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── Atualiza perfil (trigger handle_new_user já criou, mas garante extras) ─
-  const updatePayload: Record<string, string | number | boolean> = {};
-  if (phone) updatePayload.phone = phone;
-  if (document) updatePayload.document = document;
-  if (city) updatePayload.city = city;
-  if (state) updatePayload.state = state;
+  // ── Garante perfil público (trigger handle_new_user pode não existir) ─────
+  const { data: existingProfile } = await admin
+    .from('users')
+    .select('id')
+    .eq('auth_id', data.user.id)
+    .single();
 
-  if (Object.keys(updatePayload).length > 0) {
-    await admin.from('users').update(updatePayload).eq('auth_id', data.user.id);
+  if (!existingProfile) {
+    await admin.from('users').insert({
+      auth_id: data.user.id,
+      email,
+      name,
+      type: type || 'buyer',
+      status: 'active',
+      role: 'user',
+      verification_status: 'pending',
+      phone,
+      document,
+      city,
+      state,
+    });
+  } else {
+    // Atualiza extras se perfil já existir
+    const updatePayload: Record<string, string | number | boolean> = {};
+    if (phone) updatePayload.phone = phone;
+    if (document) updatePayload.document = document;
+    if (city) updatePayload.city = city;
+    if (state) updatePayload.state = state;
+    if (Object.keys(updatePayload).length > 0) {
+      await admin.from('users').update(updatePayload).eq('auth_id', data.user.id);
+    }
   }
 
   // ── Retorna sessão para login automático ──────────────────────────────────
