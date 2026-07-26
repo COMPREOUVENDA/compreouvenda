@@ -12,15 +12,6 @@ interface Category {
   created_at?: string;
 }
 
-const MOCK_CATEGORIES: Category[] = [
-  { id: '1', name: 'Eletrônicos', slug: 'eletronicos', icon: '📱', created_at: '2024-01-01' },
-  { id: '2', name: 'Veículos', slug: 'veiculos', icon: '🚗', created_at: '2024-01-01' },
-  { id: '3', name: 'Imóveis', slug: 'imoveis', icon: '🏠', created_at: '2024-01-01' },
-  { id: '4', name: 'Roupas e Acessórios', slug: 'roupas', icon: '👗', created_at: '2024-01-01' },
-  { id: '5', name: 'Esportes', slug: 'esportes', icon: '⚽', created_at: '2024-01-01' },
-  { id: '6', name: 'Móveis e Decoração', slug: 'moveis', icon: '🛋️', created_at: '2024-01-01' },
-];
-
 const DEFAULT_FORM = { name: '', slug: '', icon: '📦' };
 
 export default function AdminCategoriesPage() {
@@ -43,9 +34,9 @@ export default function AdminCategoriesPage() {
     try {
       const supabase = createClient();
       const { data } = await supabase.from('categories').select('*').order('name');
-      setCategories(data && data.length > 0 ? data : MOCK_CATEGORIES);
+      setCategories(data || []);
     } catch {
-      setCategories(MOCK_CATEGORIES);
+      setCategories([]);
     } finally {
       setLoading(false);
     }
@@ -88,13 +79,7 @@ export default function AdminCategoriesPage() {
       setShowForm(false);
       setEditingId(null);
     } catch {
-      showToast('Erro ao salvar. Usando modo demo.', 'error');
-      if (editingId) {
-        setCategories((prev) => prev.map((c) => c.id === editingId ? { ...c, ...form } : c));
-      } else {
-        setCategories((prev) => [...prev, { ...form, id: Date.now().toString(), created_at: new Date().toISOString() }]);
-      }
-      setShowForm(false);
+      showToast('Erro ao salvar.', 'error');
     } finally {
       setSaving(false);
     }
@@ -108,7 +93,7 @@ export default function AdminCategoriesPage() {
       showToast('Categoria removida!');
     } catch {
       setCategories((prev) => prev.filter((c) => c.id !== id));
-      showToast('Removida (modo demo)');
+      showToast('Removida localmente');
     } finally {
       setDeleteId(null);
     }

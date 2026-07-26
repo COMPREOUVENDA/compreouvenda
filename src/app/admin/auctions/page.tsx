@@ -2,13 +2,18 @@
 
 import { Gavel, Clock, Trophy } from 'lucide-react';
 
-const MOCK_AUCTIONS = [
-  { id: '1', product: 'PS5 + 2 Controles', seller: 'Pedro Costa', startPrice: 'R$ 2.500', currentBid: 'R$ 3.100', bids: 12, endsAt: '22/04 18:00', status: 'open' },
-  { id: '2', product: 'Câmera Canon EOS', seller: 'Maria Santos', startPrice: 'R$ 1.800', currentBid: 'R$ 2.400', bids: 8, endsAt: '21/04 20:00', status: 'open' },
-  { id: '3', product: 'Relógio Rolex', seller: 'Lucas Ferreira', startPrice: 'R$ 5.000', currentBid: 'R$ 7.200', bids: 23, endsAt: '20/04 15:00', status: 'closed' },
-];
-
 export default function AdminAuctionsPage() {
+  const auctions: {
+    id: string;
+    product: string;
+    seller: string;
+    startPrice: string;
+    currentBid: string;
+    bids: number;
+    endsAt: string;
+    status: 'open' | 'closed';
+  }[] = [];
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-3 gap-4">
@@ -36,7 +41,7 @@ export default function AdminAuctionsPage() {
             <th className="text-left text-xs text-gray-500 px-5 py-3">Status</th>
           </tr></thead>
           <tbody className="divide-y divide-gray-700/50">
-            {MOCK_AUCTIONS.map((a) => (
+            {auctions.map((a) => (
               <tr key={a.id} className="hover:bg-gray-700/30">
                 <td className="px-5 py-3 text-sm text-white">{a.product}</td>
                 <td className="px-5 py-3 text-sm text-gray-400 hidden md:table-cell">{a.seller}</td>

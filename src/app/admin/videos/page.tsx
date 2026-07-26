@@ -1,16 +1,18 @@
 'use client';
 
-import { Sparkles, Film, RefreshCw, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
-
-const MOCK_VIDEOS = [
-  { id: '1', product: 'iPhone 14 Pro Max', type: 'template', status: 'ready', duration: '20s', generatedAt: '20/04/2024 14:30', regenerations: 0 },
-  { id: '2', product: 'Sofá Retrátil', type: 'template', status: 'processing', duration: '-', generatedAt: '-', regenerations: 0 },
-  { id: '3', product: 'PS5 + 2 Controles', type: 'pika', status: 'ready', duration: '18s', generatedAt: '19/04/2024 10:15', regenerations: 1 },
-  { id: '4', product: 'Bicicleta Speed', type: 'template', status: 'failed', duration: '-', generatedAt: '-', regenerations: 2 },
-  { id: '5', product: 'MacBook Air M2', type: 'runway', status: 'ready', duration: '20s', generatedAt: '18/04/2024 09:00', regenerations: 0 },
-];
+import { Sparkles, Film, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 
 export default function AdminVideosPage() {
+  const videos: {
+    id: string;
+    product: string;
+    type: 'template' | 'pika' | 'runway';
+    status: 'ready' | 'processing' | 'failed';
+    duration: string;
+    generatedAt: string;
+    regenerations: number;
+  }[] = [];
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -46,7 +48,7 @@ export default function AdminVideosPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-700/50">
-            {MOCK_VIDEOS.map((v) => (
+            {videos.map((v) => (
               <tr key={v.id} className="hover:bg-gray-700/30">
                 <td className="px-5 py-3 text-sm text-white">{v.product}</td>
                 <td className="px-5 py-3">

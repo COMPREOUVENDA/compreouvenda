@@ -1,14 +1,19 @@
 'use client';
 
-import { Users2, Eye } from 'lucide-react';
-
-const MOCK_COMMISSIONS = [
-  { id: '1', reseller: 'Carlos Lima', owner: 'Maria Santos', product: 'iPhone 14 Pro', commission: 'R$ 260', type: '5%', status: 'paid', date: '20/04' },
-  { id: '2', reseller: 'Fernanda', owner: 'Lucas Ferreira', product: 'MacBook Air', commission: 'R$ 225', type: '3%', status: 'pending', date: '19/04' },
-  { id: '3', reseller: 'Bruno', owner: 'Ana Oliveira', product: 'Bicicleta Speed', commission: 'R$ 224', type: '8%', status: 'approved', date: '18/04' },
-];
+import { Users2 } from 'lucide-react';
 
 export default function AdminCommissionsPage() {
+  const commissions: {
+    id: string;
+    reseller: string;
+    owner: string;
+    product: string;
+    commission: string;
+    type: string;
+    status: 'paid' | 'pending' | 'approved';
+    date: string;
+  }[] = [];
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-3 gap-4">
@@ -34,7 +39,7 @@ export default function AdminCommissionsPage() {
             <th className="text-left text-xs text-gray-500 px-5 py-3">Status</th>
           </tr></thead>
           <tbody className="divide-y divide-gray-700/50">
-            {MOCK_COMMISSIONS.map((c) => (
+            {commissions.map((c) => (
               <tr key={c.id} className="hover:bg-gray-700/30">
                 <td className="px-5 py-3 text-sm text-white">{c.reseller}</td>
                 <td className="px-5 py-3 text-sm text-gray-400 hidden md:table-cell">{c.owner}</td>

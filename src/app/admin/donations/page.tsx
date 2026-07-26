@@ -2,19 +2,26 @@
 
 import { HandHeart, Heart } from 'lucide-react';
 
-const MOCK_DONATIONS = [
-  { id: '1', seller: 'Maria Santos', charity: 'AACD', product: 'iPhone 14', amount: 'R$ 80', type: '2%', status: 'transferred', date: '20/04' },
-  { id: '2', seller: 'Ana Oliveira', charity: 'Cruz Vermelha', product: 'Bicicleta', amount: 'R$ 50', type: 'Fixo', status: 'confirmed', date: '19/04' },
-  { id: '3', seller: 'Carla Lima', charity: 'UNICEF', product: 'Vestido Azul', amount: 'R$ 45', type: '10%', status: 'pending', date: '18/04' },
-];
-
-const MOCK_CHARITIES = [
-  { id: '1', name: 'AACD', verified: true, total: 'R$ 3.450', donations: 42 },
-  { id: '2', name: 'Cruz Vermelha', verified: true, total: 'R$ 2.890', donations: 31 },
-  { id: '3', name: 'UNICEF', verified: true, total: 'R$ 2.050', donations: 28 },
-];
-
 export default function AdminDonationsPage() {
+  const donations: {
+    id: string;
+    seller: string;
+    charity: string;
+    product: string;
+    amount: string;
+    type: string;
+    status: 'transferred' | 'confirmed' | 'pending';
+    date: string;
+  }[] = [];
+
+  const charities: {
+    id: string;
+    name: string;
+    verified: boolean;
+    total: string;
+    donations: number;
+  }[] = [];
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-3 gap-4">
@@ -37,7 +44,7 @@ export default function AdminDonationsPage() {
         <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-700"><h3 className="font-display font-semibold text-white">Doações Recentes</h3></div>
           <div className="divide-y divide-gray-700/50">
-            {MOCK_DONATIONS.map((d) => (
+            {donations.map((d) => (
               <div key={d.id} className="px-5 py-3 flex items-center justify-between hover:bg-gray-700/30">
                 <div>
                   <span className="text-sm text-white">{d.seller} → {d.charity}</span>
@@ -57,7 +64,7 @@ export default function AdminDonationsPage() {
         <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-700"><h3 className="font-display font-semibold text-white">Instituições Beneficentes</h3></div>
           <div className="divide-y divide-gray-700/50">
-            {MOCK_CHARITIES.map((c) => (
+            {charities.map((c) => (
               <div key={c.id} className="px-5 py-3 flex items-center justify-between hover:bg-gray-700/30">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">

@@ -38,12 +38,6 @@ const ACTION_COLORS: Record<string, string> = {
 
 const PAGE_SIZE = 20;
 
-const MOCK_LOGS: AuditLog[] = [
-  { id: '1', actor_id: '0', actor_email: 'admin@compreouvenda.com', action: 'user_suspended', target_type: 'user', target_id: null, target_email: 'pedro@email.com', details: null, ip_address: '192.168.1.100', created_at: new Date(Date.now() - 3600000).toISOString() },
-  { id: '2', actor_id: '0', actor_email: 'admin@compreouvenda.com', action: 'user_reactivated', target_type: 'user', target_id: null, target_email: 'joao@email.com', details: null, ip_address: '192.168.1.100', created_at: new Date(Date.now() - 7200000).toISOString() },
-  { id: '3', actor_id: '0', actor_email: 'maria@email.com', action: 'account_deletion_requested', target_type: 'user', target_id: null, target_email: 'maria@email.com', details: null, ip_address: null, created_at: new Date(Date.now() - 86400000).toISOString() },
-];
-
 type ActionFilter = 'all' | AuditAction;
 
 export default function AdminAuditLogsPage() {
@@ -78,15 +72,15 @@ export default function AdminAuditLogsPage() {
       const { data, count, error } = await query;
 
       if (error || !data || data.length === 0) {
-        setLogs(page === 0 ? MOCK_LOGS : []);
-        setTotal(page === 0 ? MOCK_LOGS.length : 0);
+        setLogs([]);
+        setTotal(0);
       } else {
         setLogs(data as AuditLog[]);
         setTotal(count ?? 0);
       }
     } catch {
-      setLogs(page === 0 ? MOCK_LOGS : []);
-      setTotal(page === 0 ? MOCK_LOGS.length : 0);
+      setLogs([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }

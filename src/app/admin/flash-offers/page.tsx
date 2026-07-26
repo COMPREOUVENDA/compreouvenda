@@ -2,13 +2,17 @@
 
 import { Zap, Clock } from 'lucide-react';
 
-const MOCK_FLASH = [
-  { id: '1', product: 'Sofá Retrátil', originalPrice: 'R$ 1.800', offerPrice: 'R$ 1.500', discount: '-17%', endsIn: '4h 23min', status: 'active' },
-  { id: '2', product: 'Tênis Nike Air', originalPrice: 'R$ 650', offerPrice: 'R$ 450', discount: '-31%', endsIn: '2h 10min', status: 'active' },
-  { id: '3', product: 'Fone JBL', originalPrice: 'R$ 380', offerPrice: 'R$ 250', discount: '-34%', endsIn: 'Expirado', status: 'expired' },
-];
-
 export default function AdminFlashOffersPage() {
+  const flashOffers: {
+    id: string;
+    product: string;
+    originalPrice: string;
+    offerPrice: string;
+    discount: string;
+    endsIn: string;
+    status: 'active' | 'expired';
+  }[] = [];
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-3 gap-4">
@@ -26,7 +30,7 @@ export default function AdminFlashOffersPage() {
       <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-700"><h3 className="font-display font-semibold text-white flex items-center gap-2"><Zap className="w-5 h-5 text-brand-pink" /> Ofertas Imperdíveis</h3></div>
         <div className="divide-y divide-gray-700/50">
-          {MOCK_FLASH.map((f) => (
+          {flashOffers.map((f) => (
             <div key={f.id} className="px-5 py-4 flex items-center justify-between hover:bg-gray-700/30">
               <div>
                 <span className="text-sm text-white font-medium">{f.product}</span>
