@@ -1,62 +1,44 @@
 const BASE_URL = 'https://compreouvenda.vercel.app';
-const timestamp = Date.now();
-const email = `e2e.${timestamp}@gmail.com`;
-const password = 'Teste@123456';
 
-async function signup() {
-  const res = await fetch(`${BASE_URL}/api/auth/signup-bypass`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, name: `E2E User ${timestamp}`, phone: '11999999999' }),
-  });
-  const data = await res.json();
-  if (!data.user?.id) throw new Error('Signup failed: ' + JSON.stringify(data));
-  console.log('✓ Signup OK:', data.user.id);
-  return data.session.access_token;
-}
-
-async function signin() {
-  const res = await fetch(`${BASE_URL}/api/auth/signin`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  const data = await res.json();
-  if (!data.session?.access_token) throw new Error('Signin failed: ' + JSON.stringify(data));
-  console.log('✓ Signin OK');
-  return data.session.access_token;
-}
-
-async function createProduct(token) {
-  const res = await fetch(`${BASE_URL}/api/products`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({
-      title: `Produto Teste ${timestamp}`,
-      description: 'Descrição de teste automatizado',
-      price: 99.9,
-      category_id: '00000000-0000-0000-0000-000000000000',
-      condition: 'new',
-      images: [],
-      videos: [],
-    }),
-  });
+async function post(path, body, token = null) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(BASE_URL + path, { method: 'POST', headers, body: JSON.stringify(body) });
   const text = await res.text();
-  console.log('Create product status:', res.status, text.slice(0, 200));
-  try { return JSON.parse(text); } catch { return { error: text.slice(0, 100) }; }
+  let data;
+  try { data = JSON.parse(text); } catch { data = text; }
+  return { status: res.status, data };
 }
 
-async function run() {
-  try {
-    const token = await signup();
-    await signin();
-    const product = await createProduct(token);
-    if (!product.success) throw new Error('Create product failed: ' + JSON.stringify(product));
-    console.log('✓ Product OK:', product.product.id);
-    console.log('\n✅ Fluxo E2E concluído com sucesso');
-  } catch (e) {
-    console.error('\n❌ Fluxo E2E falhou:', e.message);
-  }
+async function main() {
+  const ts = Date.now();
+  const email = `e2e.${ts}@test.com`;
+  const password = 'Teste@123456';
+
+  console.log('1. Signup:', email);
+  const signup = await post('/api/auth/signup-bypass', { email, password, name: 'E2E User', type: 'seller' });
+  console.log('   status', signup.status, signup.data);
+  if (signup.status !== 200 && signup.status !== 201) throw new Error('Signup failed');
+
+  console.log('2. Signin');
+  const signin = await post('/api/auth/signin', { email, password });
+  console.log('   status', signin.status);
+  if (signin.status !== 200) throw new Error('Signin failed: ' + JSON.stringify(signin.data));
+  const token = signin.data.session.access_token;
+
+  console.log('3. Create product');
+  const product = await post('/api/products', {
+    title: `Produto E2E ${ts}`,
+    description: 'Descrição de teste',
+    price: 99.9,
+    category_id: '550e8400-e29b-41d4-a716-446655440000',
+    condition: 'new',
+    images: ['https://placehold.co/600x400'],
+  }, token);
+  console.log('   status', product.status, product.data);
+  if (product.status !== 200) throw new Error('Create product failed: ' + JSON.stringify(product.data));
+
+  console.log('\n✅ Fluxo E2E completo funcionando!');
 }
 
-run();
+main().catch(e => { console.error('\n❌', e.message); process.exit(1); });

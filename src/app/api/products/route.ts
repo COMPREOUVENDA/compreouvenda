@@ -62,7 +62,10 @@ export async function POST(req: NextRequest) {
         .select('id');
       if (insertErr) {
         console.error('[products] auto-create profile error:', insertErr);
-        return NextResponse.json({ error: 'Perfil não encontrado.' }, { status: 404 });
+        return NextResponse.json(
+          { error: 'Perfil não encontrado.', detail: insertErr.message, code: insertErr.code },
+          { status: 404 }
+        );
       }
       profile = inserted?.[0];
     }
