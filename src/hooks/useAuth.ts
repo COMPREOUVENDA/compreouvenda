@@ -64,65 +64,54 @@ export function useAuth() {
   const signIn = async (email: string, password: string) => {
     setLoading(true);
 
-    // Timeout global de 20s — cobre fetch + setSession + fallback browser
-    const globalTimeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Login timeout - tente novamente')), 20_000)
-    );
-
     try {
-      const loginAttempt = async () => {
-        // 1. Tenta login server-side primeiro (contorna BOM na anon key)
-        try {
-          const res = await fetch('/api/auth/signin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
-          });
+      // 1. Login server-side (contorna BOM na anon key do Vercel)
+      const res = await fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
-          if (res.ok) {
-            const json = await res.json();
-            if (json.session?.access_token) {
-              // setSession pode travar se o browser client tiver BOM — por isso o timeout global existe
-              const { error: setSessionError } = await supabase.auth.setSession({
-                access_token: json.session.access_token,
-                refresh_token: json.session.refresh_token,
-              });
-              if (!setSessionError) {
-                const { data: refreshData } = await supabase.auth.getSession();
-                if (refreshData.session) {
-                  await loadProfile(refreshData.session.user.id);
-                  return { user: refreshData.session.user, session: refreshData.session };
-                }
-              }
-            }
-          } else {
-            const errJson = await res.json().catch(() => ({ error: 'Login failed' }));
-            // Se o server retornou 401 (credenciais inválidas), propagar o erro
-            if (res.status === 401) {
-              throw new Error(errJson.error || 'invalid_credentials');
-            }
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({ error: 'Login failed' }));
+        throw new Error(errJson.error || 'invalid_credentials');
+      }
+
+      const json = await res.json();
+
+      if (json.session?.access_token) {
+        // Tentar setSession com timeout curto (3s) — pode travar com BOM
+        try {
+          const setSessionResult = await Promise.race([
+            supabase.auth.setSession({
+              access_token: json.session.access_token,
+              refresh_token: json.session.refresh_token,
+            }),
+            new Promise<{ error: null }>((resolve) =>
+              setTimeout(() => resolve({ error: null }), 3000)
+            ),
+          ]);
+
+          if (!setSessionResult.error) {
+            // Carregar perfil usando o user_id retornado pelo server
+            await loadProfile(json.user.id);
+            setLoading(false);
+            return { user: json.user, session: json.session };
           }
-        } catch (serverErr: any) {
-          // Se as credenciais estão erradas, não tenta fallback
-          if (serverErr?.message?.includes('invalid_credentials') || serverErr?.message?.includes('Invalid login')) {
-            throw serverErr;
-          }
-          console.warn('[signIn] server-side error, tentando fallback browser:', serverErr?.message);
+        } catch {
+          // setSession falhou, mas login server-side foi ok
         }
 
-        // 2. Fallback: login direto no browser
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        if (data.user) await loadProfile(data.user.id);
-        return data;
-      };
+        // Mesmo se setSession falhou, o login foi validado — carregar perfil e redirecionar
+        await loadProfile(json.user.id);
+        setLoading(false);
+        return { user: json.user, session: json.session };
+      }
 
-      const result = await Promise.race([loginAttempt(), globalTimeout]);
-      return result;
+      throw new Error('Resposta inválida do servidor');
     } catch (err: any) {
-      throw err;
-    } finally {
       setLoading(false);
+      throw err;
     }
   };
 
