@@ -9,6 +9,11 @@ function getServerClient() {
   );
 }
 
+function cleanEnv(value: string | undefined): string {
+  if (!value) return '';
+  return value.replace(/^\uFEFF/, '').trim();
+}
+
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization');
@@ -17,7 +22,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
     }
 
-    const supabase = getServerClient();
+    const supabaseUrl = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL);
+    const anonKey = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+    const serviceRoleKey = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
 
     if (userError || !userData.user) {
@@ -57,10 +68,10 @@ export async function POST(req: NextRequest) {
         userData.user.email?.split('@')[0] ||
         'Usuário';
       const type = userData.user.user_metadata?.type || 'buyer';
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/users`, {
+      const res = await fetch(`${supabaseUrl}/rest/v1/users`, {
         method: 'POST',
         headers: {
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          apikey: anonKey,
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
           Prefer: 'return=representation',
