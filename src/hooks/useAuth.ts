@@ -1,17 +1,27 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { createBrowserClient } from '@supabase/ssr';
 import { useAuthStore } from '@/stores/authStore';
 import type { User, LGPDConsents } from '@/types';
 
-const supabase = createClient();
+function cleanEnv(value: string | undefined): string {
+  if (!value) return '';
+  return value.replace(/^\uFEFF/, '').trim();
+}
 
+function createSupabaseClient() {
+  return createBrowserClient(
+    cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  );
+}
 
 export function useAuth() {
   const { user, isLoading, setUser, setLoading } = useAuthStore();
   const router = useRouter();
+  const supabase = useMemo(() => createSupabaseClient(), []);
 
   // Load user profile from public.users table
   const loadProfile = useCallback(async (authId: string) => {
