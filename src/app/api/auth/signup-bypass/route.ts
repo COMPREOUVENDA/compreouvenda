@@ -103,14 +103,16 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Garante perfil público (trigger handle_new_user pode não existir) ─────
-  const { data: existingProfile } = await admin
+  const { data: existingProfile, error: findError } = await admin
     .from('users')
     .select('id')
     .eq('auth_id', data.user.id)
     .single();
 
+  console.log('[signup-bypass] existingProfile:', existingProfile, 'findError:', findError);
+
   if (!existingProfile) {
-    await admin.from('users').insert({
+    const insertPayload = {
       auth_id: data.user.id,
       email,
       name,
@@ -122,7 +124,9 @@ export async function POST(req: NextRequest) {
       document,
       city,
       state,
-    });
+    };
+    const { data: inserted, error: insertError } = await admin.from('users').insert(insertPayload).select().single();
+    console.log('[signup-bypass] insert result:', inserted, 'error:', insertError);
   } else {
     // Atualiza extras se perfil já existir
     const updatePayload: Record<string, string | number | boolean> = {};
