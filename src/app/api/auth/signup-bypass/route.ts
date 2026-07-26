@@ -103,13 +103,13 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Garante perfil público (trigger handle_new_user pode não existir) ─────
-  const { data: existingProfile, error: findError } = await admin
+  const { data: existingProfiles } = await admin
     .from('users')
     .select('id')
-    .eq('auth_id', data.user.id)
-    .single();
+    .eq('auth_id', data.user.id);
 
-  console.log('[signup-bypass] existingProfile:', existingProfile, 'findError:', findError);
+  const existingProfile = existingProfiles?.[0];
+  console.log('[signup-bypass] existingProfile:', existingProfile);
 
   if (!existingProfile) {
     const insertPayload = {
@@ -122,8 +122,11 @@ export async function POST(req: NextRequest) {
       city,
       state,
     };
-    const { data: inserted, error: insertError } = await admin.from('users').insert(insertPayload).select().single();
-    console.log('[signup-bypass] insert result:', inserted, 'error:', insertError);
+    const { data: insertedProfiles, error: insertError } = await admin
+      .from('users')
+      .insert(insertPayload)
+      .select('id');
+    console.log('[signup-bypass] insert result:', insertedProfiles, 'error:', insertError);
   } else {
     // Atualiza extras se perfil já existir
     const updatePayload: Record<string, string | number | boolean> = {};

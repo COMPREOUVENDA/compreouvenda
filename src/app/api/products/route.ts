@@ -42,11 +42,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Campos obrigatórios ausentes.' }, { status: 400 });
     }
 
-    const { data: profile } = await supabase
+    const { data: profileRows } = await supabase
       .from('users')
       .select('id')
-      .eq('auth_id', userData.user.id)
-      .single();
+      .eq('auth_id', userData.user.id);
+
+    let profile = profileRows?.[0];
+
+    if (!profile) {
+      // Fallback: cria perfil automaticamente se o trigger falhou
+      const name =
+        userData.user.user_metadata?.name ||
+        userData.user.email?.split('@')[0] ||
+        'Usuário';
+      const type = userData.user.user_metadata?.type || 'buyer';
+      const { data: inserted, error: insertErr } = await supabase
+        .from('users')
+        .insert({ auth_id: userData.user.id, email: userData.user.email, name, type })
+        .select('id');
+      if (insertErr) {
+        console.error('[products] auto-create profile error:', insertErr);
+        return NextResponse.json({ error: 'Perfil não encontrado.' }, { status: 404 });
+      }
+      profile = inserted?.[0];
+    }
 
     if (!profile) {
       return NextResponse.json({ error: 'Perfil não encontrado.' }, { status: 404 });
