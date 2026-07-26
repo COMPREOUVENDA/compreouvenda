@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+function cleanEnv(value: string | undefined): string {
+  if (!value) return '';
+  return value.replace(/^\uFEFF/, '').trim();
+}
+
 export async function GET() {
   const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
   const { data, error } = await supabase
