@@ -73,33 +73,13 @@ export function useNotifications() {
     if (!user) return;
     loadNotifications();
 
-    const queueChannel = supabase
-      .channel(`notif_queue:${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notification_queue', filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          const notif = payload.new as Notification;
-          setNotifications((prev) => [notif, ...prev]);
-          setUnreadCount((prev) => prev + 1);
+    // Polling como fallback estável enquanto o realtime do Supabase apresenta
+    // problemas de re-subscrição entre navegações (cannot add callbacks after subscribe).
+    const interval = setInterval(() => {
+      loadNotifications();
+    }, 30000);
 
-          if (Notification.permission === 'granted') {
-            new window.Notification(notif.title, {
-              body: notif.body,
-              icon: '/icons/icon-192.png',
-            });
-          }
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.warn('[useNotifications] queue channel error');
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(queueChannel);
-    };
+    return () => clearInterval(interval);
   }, [user, loadNotifications]);
 
   // Register Service Worker & Push subscription
@@ -199,81 +179,41 @@ export function useNotifications() {
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
   }, []);
 
-  // Global real-time listener for new messages across all conversations
+  // Global listener for new messages across all conversations
   useEffect(() => {
     if (!user) return;
 
-    // Fetch user's conversation IDs
-    supabase
-      .from('conversations')
-      .select('id')
-      .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
-      .then(({ data }) => {
-        if (data) {
-          convIdsRef.current = new Set(data.map((c: { id: string }) => c.id));
-        }
-      });
-
-    const msgChannel = supabase
-      .channel(`new-msgs:${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        async (payload) => {
-          const msg = payload.new as {
-            id: string; conversation_id: string; sender_id: string; content: string; type: string; created_at: string;
-          };
-
-          if (msg.sender_id === user.id) return;
-          if (!convIdsRef.current.has(msg.conversation_id)) return;
-          if (pathname?.includes('/chat')) return;
-
-          const { data: sender } = await supabase
-            .from('users')
-            .select('name, avatar_url')
-            .eq('id', msg.sender_id)
-            .single();
-
-          const preview = msg.type === 'image'
-            ? '📷 Imagem'
-            : msg.type === 'offer'
-            ? '💰 Proposta de valor'
-            : msg.content.slice(0, 80);
-
-          const alert: NewMessageAlert = {
-            id: msg.id,
-            conversationId: msg.conversation_id,
-            senderName: (sender as any)?.name || 'Alguém',
-            senderAvatar: (sender as any)?.avatar_url,
-            preview,
-            at: msg.created_at,
-          };
-
-          setMessageAlert(alert);
-
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-            new window.Notification(`💬 ${alert.senderName}`, {
-              body: preview,
-              icon: '/icons/icon-192.png',
-              tag: `msg-${msg.conversation_id}`,
-              renotify: true,
-            } as NotificationOptions & { renotify: boolean });
-          }
-
-          if (dismissTimer.current) clearTimeout(dismissTimer.current);
-          dismissTimer.current = setTimeout(() => setMessageAlert(null), 6000);
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.warn('[useNotifications] messages channel error');
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(msgChannel);
-      if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    // Polling de mensagens não lidas como fallback estável.
+    const loadUnreadMessages = async () => {
+      const { data } = await supabase
+        .from('messages')
+        .select('id, conversation_id, sender_id, content, type, created_at, sender:users!messages_sender_id_fkey(name, avatar_url)')
+        .neq('sender_id', user.id)
+        .eq('read', false)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const msg = data?.[0] as any;
+      if (msg && !pathname?.includes('/chat')) {
+        const preview = msg.type === 'image'
+          ? '📷 Imagem'
+          : msg.type === 'offer'
+          ? '💰 Proposta de valor'
+          : msg.content?.slice(0, 80) || '';
+        setMessageAlert({
+          id: msg.id,
+          conversationId: msg.conversation_id,
+          senderName: msg.sender?.name || 'Alguém',
+          senderAvatar: msg.sender?.avatar_url,
+          preview,
+          at: msg.created_at,
+        });
+      }
     };
+
+    loadUnreadMessages();
+    const interval = setInterval(loadUnreadMessages, 30000);
+
+    return () => clearInterval(interval);
   }, [user, pathname]);
 
   return {
