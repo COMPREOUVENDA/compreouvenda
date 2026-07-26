@@ -23,16 +23,29 @@ export function useAuth() {
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseClient(), []);
 
-  // Load user profile from public.users table
+  // Load user profile via API server-side (contorna BOM no browser Supabase client)
   const loadProfile = useCallback(async (authId: string) => {
-    const { data } = await supabase
-      .from('users')
-      .select('*')
-      .eq('auth_id', authId)
-      .single();
-
-    if (data) {
-      setUser(data as User);
+    try {
+      const res = await fetch(`/api/auth/me?authId=${authId}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.user) {
+          setUser(json.user as User);
+          return;
+        }
+      }
+    } catch {
+      // fallback silencioso
+    }
+    // Fallback: tentar via browser Supabase client (pode falhar com BOM)
+    try {
+      const { data } = await Promise.race([
+        supabase.from('users').select('*').eq('auth_id', authId).single(),
+        new Promise<{ data: null }>((resolve) => setTimeout(() => resolve({ data: null }), 3000)),
+      ]);
+      if (data) setUser(data as User);
+    } catch {
+      // silencioso — perfil será carregado na próxima navegação
     }
   }, [setUser]);
 
