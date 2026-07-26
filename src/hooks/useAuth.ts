@@ -99,21 +99,29 @@ export function useAuth() {
       clearTimeout(timeout);
     }
 
-    // Fallback no browser
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    // Fallback no browser com timeout de 10s
+    try {
+      const browserResult = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Login timeout - tente novamente')), 10_000)),
+      ]);
 
-    if (error) {
+      const { data, error } = browserResult;
+
+      if (error) {
+        setLoading(false);
+        throw error;
+      }
+
+      if (data.user) {
+        await loadProfile(data.user.id);
+      }
       setLoading(false);
-      throw error;
+      return data;
+    } catch (browserError: any) {
+      setLoading(false);
+      throw browserError;
     }
-
-    if (data.user) {
-      await loadProfile(data.user.id);
-      // TODO: reativar contas pendentes de exclusão quando as colunas status/deleted_at forem adicionadas ao schema
-      // TODO: bloquear contas com status 'blocked' ou 'suspended'
-    }
-    setLoading(false);
-    return data;
   };
 
   const signUp = async (
