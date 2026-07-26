@@ -73,45 +73,9 @@ export function useNotifications() {
     if (!user) return;
     loadNotifications();
 
-    // Listen on notification_queue
-    const queueChannel = supabase
-      .channel(`notif_queue:${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notification_queue', filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          const notif = payload.new as Notification;
-          setNotifications((prev) => [notif, ...prev]);
-          setUnreadCount((prev) => prev + 1);
-
-          if (Notification.permission === 'granted') {
-            new window.Notification(notif.title, {
-              body: notif.body,
-              icon: '/icons/icon-192.png',
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    // Also listen on legacy notifications table if it exists
-    const legacyChannel = supabase
-      .channel(`notifications:${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          const notif = payload.new as Notification;
-          setNotifications((prev) => [notif, ...prev]);
-          setUnreadCount((prev) => prev + 1);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(queueChannel);
-      supabase.removeChannel(legacyChannel);
-    };
+    // TODO: reativar realtime quando o bug do Supabase realtime for resolvido
+    // (erro: cannot add postgres_changes callbacks after subscribe())
+    return () => {};
   }, [user, loadNotifications]);
 
   // Register Service Worker & Push subscription
@@ -215,96 +179,8 @@ export function useNotifications() {
   useEffect(() => {
     if (!user) return;
 
-    // First, load user's conversation IDs
-    supabase
-      .from('conversations')
-      .select('id')
-      .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
-      .then(({ data }) => {
-        if (data) {
-          convIdsRef.current = new Set(data.map((c: { id: string }) => c.id));
-        }
-      });
-
-    // Keep conversation IDs in sync
-    const convChannel = supabase
-      .channel(`user-convs:${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'conversations', filter: `buyer_id=eq.${user.id}` },
-        (p) => { convIdsRef.current.add((p.new as { id: string }).id); }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'conversations', filter: `seller_id=eq.${user.id}` },
-        (p) => { convIdsRef.current.add((p.new as { id: string }).id); }
-      )
-      .subscribe();
-
-    // Listen for new messages globally
-    const msgChannel = supabase
-      .channel(`new-msgs:${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        async (payload) => {
-          const msg = payload.new as {
-            id: string; conversation_id: string; sender_id: string; content: string; type: string; created_at: string;
-          };
-
-          // Skip own messages
-          if (msg.sender_id === user.id) return;
-          // Only care about conversations the user is part of
-          if (!convIdsRef.current.has(msg.conversation_id)) return;
-          // Skip if user is already viewing this conversation
-          if (pathname?.includes('/chat')) return;
-
-          // Fetch sender info
-          const { data: sender } = await supabase
-            .from('users')
-            .select('name, avatar_url')
-            .eq('id', msg.sender_id)
-            .single();
-
-          const preview = msg.type === 'image'
-            ? '📷 Imagem'
-            : msg.type === 'offer'
-            ? '💰 Proposta de valor'
-            : msg.content.slice(0, 80);
-
-          const alert: NewMessageAlert = {
-            id: msg.id,
-            conversationId: msg.conversation_id,
-            senderName: (sender as any)?.name || 'Alguém',
-            senderAvatar: (sender as any)?.avatar_url,
-            preview,
-            at: msg.created_at,
-          };
-
-          setMessageAlert(alert);
-
-          // Native browser notification
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-            new window.Notification(`💬 ${alert.senderName}`, {
-              body: preview,
-              icon: '/icons/icon-192.png',
-              tag: `msg-${msg.conversation_id}`,
-              renotify: true,
-            } as NotificationOptions & { renotify: boolean });
-          }
-
-          // Auto-dismiss after 6s
-          if (dismissTimer.current) clearTimeout(dismissTimer.current);
-          dismissTimer.current = setTimeout(() => setMessageAlert(null), 6000);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(convChannel);
-      supabase.removeChannel(msgChannel);
-      if (dismissTimer.current) clearTimeout(dismissTimer.current);
-    };
+    // TODO: reativar realtime de mensagens quando o bug do Supabase realtime for resolvido
+    return () => {};
   }, [user, pathname]);
 
   return {
