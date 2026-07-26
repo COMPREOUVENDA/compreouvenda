@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import type { Order } from '@/types';
 import { PLATFORM_FEE_PERCENT } from '@/lib/constants';
 
 const supabase = createClient();
+const POLL_INTERVAL = 30_000;
 
 export function useOrders() {
   const { user } = useAuthStore();
@@ -14,45 +15,6 @@ export function useOrders() {
   const [sales, setSales] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const realtimeRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-
-  // Realtime subscription for orders updates
-  useEffect(() => {
-    if (!user) return;
-
-    const channel = supabase
-      .channel(`orders:${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders', filter: `buyer_id=eq.${user.id}` },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setOrders((prev) => [payload.new as Order, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setOrders((prev) =>
-              prev.map((o) => (o.id === (payload.new as Order).id ? (payload.new as Order) : o))
-            );
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders', filter: `seller_id=eq.${user.id}` },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setSales((prev) => [payload.new as Order, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setSales((prev) =>
-              prev.map((o) => (o.id === (payload.new as Order).id ? (payload.new as Order) : o))
-            );
-          }
-        }
-      )
-      .subscribe();
-
-    realtimeRef.current = channel;
-    return () => { supabase.removeChannel(channel); };
-  }, [user]);
 
   const getMyOrders = useCallback(async (): Promise<Order[]> => {
     if (!user) {
@@ -115,6 +77,18 @@ export function useOrders() {
       setLoading(false);
     }
   }, [user]);
+
+  // Polling para atualizar pedidos periodicamente (substitui Supabase Realtime que causava crash SPA)
+  useEffect(() => {
+    if (!user) return;
+    getMyOrders();
+    getMySales();
+    const interval = setInterval(() => {
+      getMyOrders();
+      getMySales();
+    }, POLL_INTERVAL);
+    return () => clearInterval(interval);
+  }, [user, getMyOrders, getMySales]);
 
   const createOrder = useCallback(
     async (

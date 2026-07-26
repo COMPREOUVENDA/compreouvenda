@@ -1,10 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
-
-const supabase = createClient();
 
 export type OrderStatus =
   | 'pending_payment'
@@ -40,20 +37,37 @@ export interface NewOrderAlert {
   at: string;
 }
 
+const POLL_INTERVAL = 15_000;
+
 export function useRealtimeOrders(role: 'buyer' | 'seller' = 'seller') {
   const { user } = useAuthStore();
   const [orders, setOrders] = useState<RealtimeOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [newOrderAlert, setNewOrderAlert] = useState<NewOrderAlert | null>(null);
   const alertTimer = useRef<NodeJS.Timeout | null>(null);
+  const prevIdsRef = useRef<Set<string>>(new Set());
 
   const loadOrders = useCallback(async () => {
     if (!user) { setLoading(false); return; }
-    setLoading(true);
     try {
       const res = await fetch(`/api/orders?userId=${user.id}&role=${role}&limit=50`);
       const json = await res.json();
-      setOrders(json.orders || []);
+      const fetched: RealtimeOrder[] = json.orders || [];
+
+      // Detectar novos pedidos comparando com o conjunto anterior
+      if (prevIdsRef.current.size > 0 && role === 'seller') {
+        for (const order of fetched) {
+          if (!prevIdsRef.current.has(order.id)) {
+            setNewOrderAlert({ order, at: new Date().toISOString() });
+            if (alertTimer.current) clearTimeout(alertTimer.current);
+            alertTimer.current = setTimeout(() => setNewOrderAlert(null), 8000);
+            break;
+          }
+        }
+      }
+
+      prevIdsRef.current = new Set(fetched.map((o) => o.id));
+      setOrders(fetched);
     } catch (e) {
       console.error('[useRealtimeOrders] loadOrders error:', e);
     } finally {
@@ -63,75 +77,12 @@ export function useRealtimeOrders(role: 'buyer' | 'seller' = 'seller') {
 
   useEffect(() => {
     loadOrders();
-  }, [loadOrders]);
-
-  // Realtime subscription via Supabase postgres_changes
-  useEffect(() => {
-    if (!user) return;
-
-    const column = role === 'seller' ? 'seller_id' : 'buyer_id';
-    const channelName = `orders-rt-${role}-${user.id}`;
-
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'orders',
-          filter: `${column}=eq.${user.id}`,
-        },
-        async (payload) => {
-          // Buscar dados completos do novo pedido
-          const { data } = await supabase
-            .from('orders')
-            .select(`
-              id, status, amount, payment_method, delivery_type,
-              created_at, tracking_code,
-              product:products(id, title, images:product_images(url)),
-              buyer:users!orders_buyer_id_fkey(id, name, avatar_url),
-              seller:users!orders_seller_id_fkey(id, name, avatar_url)
-            `)
-            .eq('id', payload.new.id)
-            .single();
-
-          if (data) {
-            const order = data as unknown as RealtimeOrder;
-            setOrders((prev) => [order, ...prev]);
-
-            // Mostrar alerta para vendedores
-            if (role === 'seller') {
-              setNewOrderAlert({ order, at: new Date().toISOString() });
-              if (alertTimer.current) clearTimeout(alertTimer.current);
-              alertTimer.current = setTimeout(() => setNewOrderAlert(null), 8000);
-            }
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'orders',
-          filter: `${column}=eq.${user.id}`,
-        },
-        (payload) => {
-          setOrders((prev) =>
-            prev.map((o) =>
-              o.id === payload.new.id ? { ...o, ...(payload.new as Partial<RealtimeOrder>) } : o
-            )
-          );
-        }
-      )
-      .subscribe();
-
+    const interval = setInterval(loadOrders, POLL_INTERVAL);
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(interval);
       if (alertTimer.current) clearTimeout(alertTimer.current);
     };
-  }, [user, role]);
+  }, [loadOrders]);
 
   const dismissAlert = useCallback(() => {
     setNewOrderAlert(null);
@@ -155,7 +106,6 @@ export function useRealtimeOrders(role: 'buyer' | 'seller' = 'seller') {
     []
   );
 
-  // Contadores úteis
   const pendingCount = orders.filter((o) => o.status === 'confirmed' || o.status === 'pending_payment').length;
   const toShipCount = orders.filter((o) => o.status === 'confirmed').length;
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, SlidersHorizontal, ChevronDown, RotateCcw } from 'lucide-react';
-import { CATEGORIES } from '@/lib/constants';
+
 
 export interface FeedFilters {
   priceMin: string;

@@ -58,14 +58,19 @@ export function useChat() {
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
-  // Subscribe to conversation updates
+  // Subscribe to conversation updates (com cleanup defensivo)
   useEffect(() => {
     if (!user) return;
-    const ch = supabase.channel('convs-' + user.id)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `buyer_id=eq.${user.id}` }, () => loadConversations())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `seller_id=eq.${user.id}` }, () => loadConversations())
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    let ch: any;
+    try {
+      ch = supabase.channel('convs-' + user.id + '-' + Date.now())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `buyer_id=eq.${user.id}` }, () => loadConversations())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `seller_id=eq.${user.id}` }, () => loadConversations())
+        .subscribe();
+    } catch (e) {
+      console.warn('[useChat] channel subscribe error:', e);
+    }
+    return () => { try { if (ch) supabase.removeChannel(ch); } catch {} };
   }, [user, loadConversations]);
 
   // Load messages for selected conversation
@@ -94,12 +99,13 @@ export function useChat() {
     else setMessages([]);
   }, [loadMessages]);
 
-  // Subscribe to messages in selected conversation
+  // Subscribe to messages in selected conversation (com cleanup defensivo)
   useEffect(() => {
     if (!selectedId || !user) return;
-    if (channelRef.current) supabase.removeChannel(channelRef.current);
+    if (channelRef.current) { try { supabase.removeChannel(channelRef.current); } catch {} }
 
-    const ch = supabase.channel(`msgs-${selectedId}`)
+    try {
+      const ch = supabase.channel(`msgs-${selectedId}-${Date.now()}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedId}` }, (payload) => {
         const msg = payload.new as Message;
         setMessages(prev => {
@@ -125,8 +131,11 @@ export function useChat() {
       })
       .subscribe();
 
-    channelRef.current = ch;
-    return () => { supabase.removeChannel(ch); channelRef.current = null; };
+      channelRef.current = ch;
+    } catch (e) {
+      console.warn('[useChat] messages channel subscribe error:', e);
+    }
+    return () => { try { if (channelRef.current) supabase.removeChannel(channelRef.current); channelRef.current = null; } catch {} };
   }, [selectedId, user]);
 
   // Send message — usa /api/messages para push server-side
