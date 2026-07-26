@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-
-function cleanEnv(value: string | undefined): string {
-  if (!value) return '';
-  return value.replace(/^\uFEFF/, '').trim();
-}
+import { cleanEnv } from '@/lib/env';
 
 function getUserClient(token: string) {
   const url = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL);

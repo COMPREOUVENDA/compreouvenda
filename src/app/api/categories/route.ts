@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-
-function cleanEnv(value: string | undefined): string {
-  if (!value) return '';
-  return value.replace(/^\uFEFF/, '').trim();
-}
+import { cleanEnv } from '@/lib/env';
 
 export async function GET() {
   const supabase = createClient(
