@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-function getServerClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
-}
-
 function cleanEnv(value: string | undefined): string {
   if (!value) return '';
   return value.replace(/^\uFEFF/, '').trim();
+}
+
+function getUserClient(token: string) {
+  const url = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const key = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -22,13 +23,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
     }
 
-    const supabaseUrl = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL);
-    const anonKey = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-    const serviceRoleKey = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabase = getUserClient(token);
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
 
     if (userError || !userData.user) {
@@ -61,37 +56,22 @@ export async function POST(req: NextRequest) {
     let profile = profileRows?.[0];
 
     if (!profile) {
-      // Fallback: cria perfil via REST do Supabase autenticado do usuário,
-      // pois a service role key no ambiente pode não estar bypassando RLS.
       const name =
         userData.user.user_metadata?.name ||
         userData.user.email?.split('@')[0] ||
         'Usuário';
       const type = userData.user.user_metadata?.type || 'buyer';
-      const res = await fetch(`${supabaseUrl}/rest/v1/users`, {
-        method: 'POST',
-        headers: {
-          apikey: anonKey,
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          Prefer: 'return=representation',
-        },
-        body: JSON.stringify({
-          auth_id: userData.user.id,
-          email: userData.user.email,
-          name,
-          type,
-        }),
-      });
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error('[products] auto-create profile error:', res.status, errText);
+      const { data: inserted, error: insertErr } = await supabase
+        .from('users')
+        .insert({ auth_id: userData.user.id, email: userData.user.email, name, type })
+        .select('id');
+      if (insertErr) {
+        console.error('[products] auto-create profile error:', insertErr);
         return NextResponse.json(
-          { error: 'Perfil não encontrado.', detail: errText, status: res.status },
+          { error: 'Perfil não encontrado.', detail: insertErr.message, code: insertErr.code },
           { status: 404 }
         );
       }
-      const inserted = await res.json();
       profile = inserted?.[0];
     }
 
@@ -120,7 +100,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error?.message || 'Erro ao criar produto.' }, { status: 500 });
     }
 
-    // Inserir imagens se houver
     if (images?.length) {
       await supabase.from('product_images').insert(
         images.map((url: string, index: number) => ({
@@ -131,7 +110,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Inserir vídeos se houver
     if (videos?.length) {
       await supabase.from('product_videos').insert(
         videos.map((url: string, index: number) => ({
