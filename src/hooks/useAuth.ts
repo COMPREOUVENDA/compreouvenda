@@ -96,34 +96,8 @@ export function useAuth() {
 
     if (data.user) {
       await loadProfile(data.user.id);
-
-      // If account was pending deletion, reactivate it automatically on login
-      const { data: profile } = await supabase
-        .from('users')
-        .select('status, verification_status')
-        .eq('auth_id', data.user.id)
-        .single();
-
-      if (profile?.status === 'pending_deletion') {
-        await supabase
-          .from('users')
-          .update({ status: 'active', deleted_at: null, deletion_scheduled_at: null })
-          .eq('auth_id', data.user.id);
-        await loadProfile(data.user.id);
-      }
-
-      // Block access only if explicitly blocked or suspended
-      if (profile?.status === 'blocked') {
-        await supabase.auth.signOut();
-        setLoading(false);
-        throw new Error('blocked: Sua conta foi bloqueada. Entre em contato com o suporte.');
-      }
-      if (profile?.status === 'suspended' || profile?.verification_status === 'rejected') {
-        await supabase.auth.signOut();
-        setLoading(false);
-        throw new Error('suspended: Sua conta está suspensa. Entre em contato com o suporte.');
-      }
-      // verification_status='pending' or 'approved' — allow access normally
+      // TODO: reativar contas pendentes de exclusão quando as colunas status/deleted_at forem adicionadas ao schema
+      // TODO: bloquear contas com status 'blocked' ou 'suspended'
     }
     setLoading(false);
     return data;
