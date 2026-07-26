@@ -1,4 +1,12 @@
 const BASE_URL = 'https://compreouvenda.vercel.app';
+const SUPABASE_URL = 'https://auxaajrjwbdsnxtvgmsb.supabase.co';
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1eGFhcmpyd2Jkc254dHZnbXNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMjI5NDYsImV4cCI6MjA1MjY5ODk0Nn0.0YKC1N4qUjK8Dn6S0e3P0Mk_bXLW7f8A1uLqvw9A1tY';
+
+async function getAnyCategory() {
+  const res = await fetch(`${BASE_URL}/api/categories`);
+  const data = await res.json();
+  return data?.categories?.[0]?.id;
+}
 
 async function post(path, body, token = null) {
   const headers = { 'Content-Type': 'application/json' };
@@ -11,13 +19,20 @@ async function post(path, body, token = null) {
 }
 
 async function main() {
+  const categoryId = await getAnyCategory();
+  if (!categoryId) {
+    console.error('Nenhuma categoria encontrada no banco.');
+    process.exit(1);
+  }
+  console.log('Categoria escolhida:', categoryId);
+
   const ts = Date.now();
   const email = `e2e.${ts}@test.com`;
   const password = 'Teste@123456';
 
   console.log('1. Signup:', email);
   const signup = await post('/api/auth/signup-bypass', { email, password, name: 'E2E User', type: 'seller' });
-  console.log('   status', signup.status, signup.data);
+  console.log('   status', signup.status, signup.data?.user?.id ? 'OK' : 'FAIL');
   if (signup.status !== 200 && signup.status !== 201) throw new Error('Signup failed');
 
   console.log('2. Signin');
@@ -31,11 +46,11 @@ async function main() {
     title: `Produto E2E ${ts}`,
     description: 'Descrição de teste',
     price: 99.9,
-    category_id: '550e8400-e29b-41d4-a716-446655440000',
+    category_id: categoryId,
     condition: 'new',
     images: ['https://placehold.co/600x400'],
   }, token);
-  console.log('   status', product.status, product.data);
+  console.log('   status', product.status, product.data?.success ? 'OK' : JSON.stringify(product.data));
   if (product.status !== 200) throw new Error('Create product failed: ' + JSON.stringify(product.data));
 
   console.log('\n✅ Fluxo E2E completo funcionando!');
