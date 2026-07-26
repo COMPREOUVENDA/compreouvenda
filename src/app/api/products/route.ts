@@ -50,13 +50,22 @@ export async function POST(req: NextRequest) {
     let profile = profileRows?.[0];
 
     if (!profile) {
-      // Fallback: cria perfil automaticamente se o trigger falhou
+      // Fallback: cria perfil com cliente anon autenticado do usuário,
+      // pois a service role key no ambiente pode não estar bypassando RLS.
+      const userClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          auth: { autoRefreshToken: false, persistSession: false },
+          global: { headers: { Authorization: `Bearer ${token}` } },
+        }
+      );
       const name =
         userData.user.user_metadata?.name ||
         userData.user.email?.split('@')[0] ||
         'Usuário';
       const type = userData.user.user_metadata?.type || 'buyer';
-      const { data: inserted, error: insertErr } = await supabase
+      const { data: inserted, error: insertErr } = await userClient
         .from('users')
         .insert({ auth_id: userData.user.id, email: userData.user.email, name, type })
         .select('id');
