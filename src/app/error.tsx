@@ -38,11 +38,8 @@ export default function GlobalError({
         <h1 className="font-bold text-2xl text-gray-900 mb-3">
           Algo deu errado
         </h1>
-        <p className="text-gray-500 text-base max-w-xs mb-2">
+        <p className="text-gray-500 text-base max-w-xs mb-8">
           Ocorreu um erro inesperado. Nossa equipe já foi notificada.
-        </p>
-        <p className="text-xs text-red-500 mb-8 break-all px-4">
-          {error.message || error.digest || 'unknown'}
         </p>
 
         <div className="flex flex-col gap-3 w-full max-w-xs">

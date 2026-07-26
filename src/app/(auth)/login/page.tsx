@@ -27,7 +27,6 @@ export default function LoginPage() {
       const profile = data?.user ? data : null;
       router.push('/dashboard');
     } catch (err: any) {
-      console.error('[login] error:', err);
       const msg = err?.message || '';
       if (msg.includes('Invalid login') || msg.includes('invalid_credentials')) {
         setError('E-mail ou senha incorretos');
@@ -36,7 +35,7 @@ export default function LoginPage() {
       } else if (msg.includes('blocked') || msg.includes('suspended')) {
         setError('Sua conta está suspensa. Entre em contato com o suporte.');
       } else {
-        setError('Erro ao entrar: ' + msg.slice(0, 120));
+        setError('Erro ao entrar. Tente novamente.');
       }
     } finally {
       setLoading(false);
