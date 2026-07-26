@@ -5,15 +5,12 @@
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.users (auth_id, email, name, type, status, role, verification_status)
+  INSERT INTO public.users (auth_id, email, name, type)
   VALUES (
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
-    COALESCE(NEW.raw_user_meta_data->>'type', 'buyer'),
-    'active',
-    'user',
-    'pending'
+    COALESCE(NEW.raw_user_meta_data->>'type', 'buyer')
   )
   ON CONFLICT (auth_id) DO NOTHING;
   RETURN NEW;
