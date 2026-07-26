@@ -89,9 +89,10 @@ export async function POST(req: NextRequest) {
         category_id,
         condition,
         status: 'active',
-        location: location || '',
-        latitude: latitude || null,
-        longitude: longitude || null,
+        city: location || '',
+        state: '',
+        location_lat: latitude || null,
+        location_lng: longitude || null,
       })
       .select()
       .single();
