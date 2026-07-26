@@ -53,41 +53,37 @@ export function useAuth() {
 
   const signIn = async (email: string, password: string) => {
     setLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
 
-    // Fallback server-side: se a anon key no browser estiver com problema,
-    // tenta login pela API segura do servidor.
-    if (error && !data.session) {
-      try {
-        const res = await fetch('/api/auth/signin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        });
-        if (res.ok) {
-          const json = await res.json();
-          if (json.session?.access_token) {
-            const { error: setSessionError } = await supabase.auth.setSession({
-              access_token: json.session.access_token,
-              refresh_token: json.session.refresh_token,
-            });
-            if (!setSessionError) {
-              const { data: refreshData } = await supabase.auth.getSession();
-              if (refreshData.session) {
-                setLoading(false);
-                await loadProfile(refreshData.session.user.id);
-                return { user: refreshData.session.user, session: refreshData.session };
-              }
+    // Tenta login server-side primeiro, pois a anon key no browser pode estar com BOM/inválida na Vercel.
+    try {
+      const res = await fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.session?.access_token) {
+          const { error: setSessionError } = await supabase.auth.setSession({
+            access_token: json.session.access_token,
+            refresh_token: json.session.refresh_token,
+          });
+          if (!setSessionError) {
+            const { data: refreshData } = await supabase.auth.getSession();
+            if (refreshData.session) {
+              setLoading(false);
+              await loadProfile(refreshData.session.user.id);
+              return { user: refreshData.session.user, session: refreshData.session };
             }
           }
         }
-      } catch (fallbackError) {
-        console.error('[signIn] fallback error:', fallbackError);
       }
+    } catch (fallbackError) {
+      console.error('[signIn] server-side fallback error:', fallbackError);
     }
+
+    // Fallback no browser
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setLoading(false);
