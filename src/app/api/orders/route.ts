@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/server';
 // Usar push-notifications.ts: faz DB insert + web-push real
 import {
   notifyNewOrder as pushNotifyNewOrder,
@@ -8,22 +8,23 @@ import {
 // Fallback DB-only (quando VAPID não configurado)
 import { notifyNewOrder, notifyPaymentReceived, notifyOrderStatus } from '@/lib/server-notifications';
 
-function getServiceClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
-}
-
 // ─── POST /api/orders — criar pedido ───────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
+    const supabase = createClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+    }
+
     const body = await req.json();
     const {
       product_id,
       seller_id,
-      buyer_id,
       amount,
       delivery_type,
       payment_method,
@@ -34,11 +35,21 @@ export async function POST(req: NextRequest) {
       address,
     } = body;
 
-    if (!product_id || !seller_id || !buyer_id || !amount) {
+    if (!product_id || !seller_id || !amount) {
       return NextResponse.json({ error: 'Campos obrigatórios ausentes.' }, { status: 400 });
     }
 
-    const supabase = getServiceClient();
+    // Resolve buyer_id = id público na tabela users (FK de orders)
+    const { data: buyerProfile } = await supabase
+      .from('users')
+      .select('id, name')
+      .eq('auth_id', user.id)
+      .single();
+
+    const buyer_id = buyerProfile?.id;
+    if (!buyer_id) {
+      return NextResponse.json({ error: 'Perfil de comprador não encontrado.' }, { status: 404 });
+    }
 
     // 1. Buscar dados do produto e comprador para a notificação
     const [{ data: product }, { data: buyer }] = await Promise.all([
@@ -115,6 +126,15 @@ export async function POST(req: NextRequest) {
 // ─── PATCH /api/orders — atualizar status ──────────────────────────────────
 export async function PATCH(req: NextRequest) {
   try {
+    const supabase = createClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { orderId, status, tracking_code } = body;
 
@@ -122,14 +142,25 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'orderId e status são obrigatórios.' }, { status: 400 });
     }
 
-    const supabase = getServiceClient();
+    // Buscar perfil do usuário autenticado
+    const { data: profile } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_id', user.id)
+      .single();
+    if (!profile) return NextResponse.json({ error: 'Perfil não encontrado.' }, { status: 404 });
 
-    // Buscar pedido atual para notificação
+    // Buscar pedido atual e verificar permissão
     const { data: order } = await supabase
       .from('orders')
       .select('buyer_id, seller_id, amount, product:products(title)')
       .eq('id', orderId)
       .single();
+
+    if (!order) return NextResponse.json({ error: 'Pedido não encontrado.' }, { status: 404 });
+    if (order.buyer_id !== profile.id && order.seller_id !== profile.id) {
+      return NextResponse.json({ error: 'Sem permissão.' }, { status: 403 });
+    }
 
     const updatePayload: Record<string, unknown> = { status };
     if (tracking_code) updatePayload.tracking_code = tracking_code;
@@ -140,18 +171,16 @@ export async function PATCH(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     // Notificar comprador sobre mudança de status
-    if (order) {
-      const productTitle = (order.product as any)?.title || 'Produto';
-      notifyOrderStatus((order as any).buyer_id, { orderId, productTitle, status }).catch(console.error);
+    const productTitle = (order.product as any)?.title || 'Produto';
+    notifyOrderStatus(order.buyer_id, { orderId, productTitle, status }).catch(console.error);
 
-      // Ao confirmar entrega, notificar vendedor do pagamento liberado
-      if (status === 'delivered') {
-        notifyPaymentReceived((order as any).seller_id, {
-          orderId,
-          productTitle,
-          amount: (order as any).amount,
-        }).catch(console.error);
-      }
+    // Ao confirmar entrega, notificar vendedor do pagamento liberado
+    if (status === 'delivered') {
+      notifyPaymentReceived(order.seller_id, {
+        orderId,
+        productTitle,
+        amount: order.amount,
+      }).catch(console.error);
     }
 
     return NextResponse.json({ success: true });
@@ -163,15 +192,27 @@ export async function PATCH(req: NextRequest) {
 // ─── GET /api/orders — listar pedidos do usuário ───────────────────────────
 export async function GET(req: NextRequest) {
   try {
+    const supabase = createClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
-    const role = searchParams.get('role') || 'buyer'; // 'buyer' | 'seller'
+    const role = searchParams.get('role') || 'buyer';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
 
-    if (!userId) return NextResponse.json({ error: 'userId obrigatório.' }, { status: 400 });
+    const { data: profile } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_id', user.id)
+      .single();
+    if (!profile) return NextResponse.json({ error: 'Perfil não encontrado.' }, { status: 404 });
 
-    const supabase = getServiceClient();
     const from = (page - 1) * limit;
 
     const query = supabase
@@ -183,7 +224,7 @@ export async function GET(req: NextRequest) {
         buyer:users!orders_buyer_id_fkey(id, name, avatar_url),
         seller:users!orders_seller_id_fkey(id, name, avatar_url)
       `)
-      .eq(role === 'seller' ? 'seller_id' : 'buyer_id', userId)
+      .eq(role === 'seller' ? 'seller_id' : 'buyer_id', profile.id)
       .order('created_at', { ascending: false })
       .range(from, from + limit - 1);
 

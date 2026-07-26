@@ -143,7 +143,6 @@ export default function CheckoutPage() {
           body: JSON.stringify({
             product_id: product.id,
             seller_id: product.sellerId,
-            buyer_id: user.id,
             amount: finalPrice,
             delivery_type: deliveryType,
             payment_method: paymentMethod,

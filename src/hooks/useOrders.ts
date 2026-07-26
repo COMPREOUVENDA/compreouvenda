@@ -157,7 +157,6 @@ export function useOrders() {
           body: JSON.stringify({
             product_id: productId,
             seller_id: product.user_id,
-            buyer_id: user.id,
             amount: gross,
             delivery_type: deliveryType,
             payment_method: paymentMethod,
