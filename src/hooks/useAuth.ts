@@ -64,12 +64,17 @@ export function useAuth() {
   const signIn = async (email: string, password: string) => {
     setLoading(true);
 
+    // Timeout de 15s para evitar spinner infinito
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+
     // Tenta login server-side primeiro, pois a anon key no browser pode estar com BOM/inválida na Vercel.
     try {
       const res = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        signal: controller.signal,
       });
       if (res.ok) {
         const json = await res.json();
@@ -90,6 +95,8 @@ export function useAuth() {
       }
     } catch (fallbackError) {
       console.error('[signIn] server-side fallback error:', fallbackError);
+    } finally {
+      clearTimeout(timeout);
     }
 
     // Fallback no browser

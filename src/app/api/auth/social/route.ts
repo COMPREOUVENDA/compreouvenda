@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { cleanEnv } from '@/lib/env'
 
 const SOCIAL_PROVIDERS = ['google', 'facebook'] as const
 
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Provider inválido' }, { status: 400 })
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseUrl = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL)
   const redirectTo = `${request.nextUrl.origin}/auth/callback`
 
   // Redirect to Supabase OAuth
