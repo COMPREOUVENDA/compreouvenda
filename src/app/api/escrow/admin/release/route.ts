@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUserId, getServiceClient } from '@/lib/api-auth';
 import { releasePayment } from '@/lib/escrow';
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const authUserId = await getAuthUserId(req);
 
-    if (!user) {
+    if (!authUserId) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
-    // Verify admin
+    // Verify admin — `is_active` precisa ser checado, senão um admin
+    // desativado continua conseguindo liberar pagamentos.
+    const supabase = getServiceClient();
     const { data: admin } = await supabase
       .from('admin_users')
-      .select('id, role')
-      .eq('auth_id', user.id)
+      .select('id, role, is_active')
+      .eq('auth_id', authUserId)
+      .eq('is_active', true)
       .single();
 
     if (!admin) {

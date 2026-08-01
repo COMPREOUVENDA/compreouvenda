@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUserId, getServiceClient } from '@/lib/api-auth';
 import { openDispute } from '@/lib/escrow';
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const authUserId = await getAuthUserId(req);
 
-    if (!user) {
+    if (!authUserId) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
@@ -23,10 +22,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'orderId e reason são obrigatórios' }, { status: 400 });
     }
 
+    const supabase = getServiceClient();
     const { data: buyer } = await supabase
       .from('users')
       .select('id')
-      .eq('auth_id', user.id)
+      .eq('auth_id', authUserId)
       .single();
 
     if (!buyer) {

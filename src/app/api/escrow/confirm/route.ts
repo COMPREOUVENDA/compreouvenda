@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUserId, getServiceClient } from '@/lib/api-auth';
 import { confirmDelivery } from '@/lib/escrow';
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const authUserId = await getAuthUserId(req);
 
-    if (!user) {
+    if (!authUserId) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
@@ -18,11 +17,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'orderId e qrToken são obrigatórios' }, { status: 400 });
     }
 
-    // Get buyer's internal user ID
+    // Resolve o id público do comprador (FK usada em orders.buyer_id)
+    const supabase = getServiceClient();
     const { data: buyer } = await supabase
       .from('users')
       .select('id')
-      .eq('auth_id', user.id)
+      .eq('auth_id', authUserId)
       .single();
 
     if (!buyer) {

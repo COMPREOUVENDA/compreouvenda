@@ -132,8 +132,10 @@ export async function POST(request: NextRequest) {
     payment_status: internalStatus,
     ...(pagbankOrderId ? { payment_id: pagbankOrderId } : {}),
     ...(charges[0]?.id ? { transaction_id: charges[0].id } : {}),
-    ...(isPaid ? { paid_at: now, escrow_status: 'held' } : {}),
-    ...(internalStatus === 'refunded' ? { refunded_at: now, escrow_status: 'refunded' } : {}),
+    // `payment_held` é o valor canônico do EscrowStatus (ver src/lib/escrow.ts).
+    // Usar 'held' aqui dessincronizava orders.escrow_status de escrow_transactions.status.
+    ...(isPaid ? { paid_at: now, escrow_status: 'payment_held' } : {}),
+    ...(internalStatus === 'refunded' ? { refunded_at: now, escrow_status: 'cancelled' } : {}),
   };
 
   const selectCols = 'id, seller_id, buyer_id, gross_value, product_id, payment_status';

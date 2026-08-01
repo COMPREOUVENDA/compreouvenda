@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUserId } from '@/lib/api-auth';
 import { createEscrowTransaction } from '@/lib/escrow';
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const authUserId = await getAuthUserId(req);
 
-    if (!user) {
+    if (!authUserId) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 

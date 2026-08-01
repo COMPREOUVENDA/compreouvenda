@@ -7,7 +7,7 @@
  * Auto-release: 7 days after delivered_at if buyer doesn't confirm
  */
 
-import { createClient as createServerSupabase } from '@/lib/supabase/server';
+import { getServiceClient } from '@/lib/api-auth';
 import {
   buildQRPayload,
   generateQRToken,
@@ -15,6 +15,15 @@ import {
   computeQRHash,
   getQRImageURL,
 } from '@/lib/qrcode';
+
+/**
+ * Todas as operações de escrow rodam com o service client (bypassa RLS).
+ * A autorização é verificada explicitamente em cada função comparando
+ * `order.seller_id` / `order.buyer_id` com o ator recebido — o client de
+ * cookie não serve aqui porque as rotas também aceitam `Authorization: Bearer`
+ * (sem cookie) e as escritas em escrow_* seriam silenciosamente barradas por RLS.
+ */
+type EscrowClient = ReturnType<typeof getServiceClient>;
 
 // ==================== TYPES ====================
 
@@ -57,6 +66,24 @@ export interface EscrowActionResult {
 
 // ==================== HELPERS ====================
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * `escrow_transactions.released_by_actor` e `escrow_logs.actor_id` têm FK para
+ * `public.users(id)`. Admins vivem em `admin_users` (id diferente) e "system"
+ * não é um uuid — em ambos os casos gravar o valor viola a FK e o Postgres
+ * aborta o UPDATE inteiro, perdendo a transição de status silenciosamente.
+ * Quem executou a ação continua registrado em `released_by_admin`,
+ * `release_reason` e no `actor_type` do log.
+ */
+function actorRef(
+  actorId: string | null | undefined,
+  actorType: 'buyer' | 'seller' | 'admin' | 'system'
+): string | null {
+  if (actorType === 'admin' || actorType === 'system') return null;
+  return actorId && UUID_RE.test(actorId) ? actorId : null;
+}
+
 function getQRSecret(): string {
   const secret = process.env.ESCROW_QR_SECRET;
   if (!secret) throw new Error('ESCROW_QR_SECRET not configured');
@@ -64,7 +91,7 @@ function getQRSecret(): string {
 }
 
 async function logEscrowAction(
-  supabase: ReturnType<typeof createServerSupabase>,
+  supabase: EscrowClient,
   transactionId: string,
   action: string,
   actorId: string | null,
@@ -77,7 +104,7 @@ async function logEscrowAction(
   await supabase.from('escrow_logs').insert({
     transaction_id: transactionId,
     action,
-    actor_id: actorId,
+    actor_id: actorRef(actorId, actorType),
     actor_type: actorType,
     old_status: oldStatus,
     new_status: newStatus,
@@ -87,7 +114,7 @@ async function logEscrowAction(
 }
 
 async function sendEscrowNotification(
-  supabase: ReturnType<typeof createServerSupabase>,
+  supabase: EscrowClient,
   userId: string,
   type: string,
   title: string,
@@ -115,7 +142,7 @@ export async function createEscrowTransaction(
   buyerId: string,
   sellerId: string
 ): Promise<EscrowActionResult> {
-  const supabase = createServerSupabase();
+  const supabase = getServiceClient();
 
   // Check if escrow already exists
   const { data: existing } = await supabase
@@ -185,7 +212,7 @@ export async function markAsShipped(
   carrier?: string,
   ipAddress?: string
 ): Promise<EscrowActionResult> {
-  const supabase = createServerSupabase();
+  const supabase = getServiceClient();
 
   const { data: escrow, error } = await supabase
     .from('escrow_transactions')
@@ -246,7 +273,7 @@ export async function markAsDelivered(
   sellerId: string,
   ipAddress?: string
 ): Promise<EscrowActionResult> {
-  const supabase = createServerSupabase();
+  const supabase = getServiceClient();
 
   const { data: escrow, error } = await supabase
     .from('escrow_transactions')
@@ -331,7 +358,7 @@ export async function confirmDelivery(
   ipAddress?: string,
   deviceFingerprint?: string
 ): Promise<EscrowActionResult> {
-  const supabase = createServerSupabase();
+  const supabase = getServiceClient();
 
   // Rate limiting check (max 5 failures in 60 min)
   const { data: failCount } = await supabase
@@ -419,9 +446,9 @@ export async function releasePayment(
   orderId: string,
   releasedBy: string,
   releasedByType: 'buyer' | 'admin' | 'system',
-  supabaseOverride?: ReturnType<typeof createServerSupabase>
+  supabaseOverride?: EscrowClient
 ): Promise<EscrowActionResult> {
-  const supabase = supabaseOverride ?? createServerSupabase();
+  const supabase = supabaseOverride ?? getServiceClient();
 
   const { data: escrow } = await supabase
     .from('escrow_transactions')
@@ -433,17 +460,21 @@ export async function releasePayment(
 
   const releasedAt = new Date().toISOString();
 
-  await supabase
+  const { error: releaseError } = await supabase
     .from('escrow_transactions')
     .update({
       status: 'payment_released',
       released_at: releasedAt,
       released_by_admin: releasedByType === 'admin',
-      released_by_actor: releasedBy,
+      released_by_actor: actorRef(releasedBy, releasedByType),
     })
     .eq('id', escrow.id);
 
-  await supabase
+  if (releaseError) {
+    return { success: false, error: 'Erro ao liberar pagamento: ' + releaseError.message };
+  }
+
+  const { error: orderError } = await supabase
     .from('orders')
     .update({
       escrow_status: 'payment_released',
@@ -451,6 +482,10 @@ export async function releasePayment(
       split_status: 'processing',
     })
     .eq('id', orderId);
+
+  if (orderError) {
+    return { success: false, error: 'Erro ao atualizar pedido: ' + orderError.message };
+  }
 
   // Update payment_splits to processing
   await supabase
@@ -495,7 +530,7 @@ export async function openDispute(
   evidenceUrls: string[] = [],
   ipAddress?: string
 ): Promise<EscrowActionResult> {
-  const supabase = createServerSupabase();
+  const supabase = getServiceClient();
 
   const { data: escrow } = await supabase
     .from('escrow_transactions')
@@ -570,7 +605,7 @@ export async function resolveDispute(
   splitSellerPercent?: number,
   adminNotes?: string
 ): Promise<EscrowActionResult> {
-  const supabase = createServerSupabase();
+  const supabase = getServiceClient();
 
   const { data: dispute } = await supabase
     .from('disputes')
@@ -585,36 +620,36 @@ export async function resolveDispute(
 
   const resolvedAt = new Date().toISOString();
 
-  await supabase
-    .from('disputes')
-    .update({
-      status: 'resolved',
-      resolution,
-      split_seller_percent: resolution === 'split' ? splitSellerPercent : null,
-      resolved_by: adminId,
-      resolved_at: resolvedAt,
-      admin_notes: adminNotes ?? null,
-    })
-    .eq('id', disputeId);
-
   const { data: order } = await supabase
     .from('orders')
     .select('buyer_id, seller_id')
     .eq('id', dispute.order_id)
     .single();
 
+  // O efeito financeiro roda ANTES de marcar a disputa como resolvida: se a
+  // liberação/estorno falhar, a disputa continua aberta em vez de ficar
+  // "resolvida" com o dinheiro ainda retido.
   if (resolution === 'release_seller') {
-    await releasePayment(dispute.order_id, adminId, 'admin', supabase);
+    const rel = await releasePayment(dispute.order_id, adminId, 'admin', supabase);
+    if (!rel.success) return rel;
   } else if (resolution === 'refund_buyer') {
-    await supabase
+    const { error: cancelError } = await supabase
       .from('escrow_transactions')
       .update({ status: 'cancelled', released_at: resolvedAt })
       .eq('id', dispute.escrow_transaction_id);
 
-    await supabase
+    if (cancelError) {
+      return { success: false, error: 'Erro ao cancelar escrow: ' + cancelError.message };
+    }
+
+    const { error: refundError } = await supabase
       .from('orders')
       .update({ escrow_status: 'cancelled', payment_status: 'refunded' })
       .eq('id', dispute.order_id);
+
+    if (refundError) {
+      return { success: false, error: 'Erro ao registrar reembolso: ' + refundError.message };
+    }
 
     if (order) {
       await sendEscrowNotification(
@@ -626,12 +661,30 @@ export async function resolveDispute(
     }
   } else if (resolution === 'split' && splitSellerPercent !== undefined) {
     // Mark as released with split — actual split logic handled by payment system
-    await releasePayment(dispute.order_id, adminId, 'admin', supabase);
+    const rel = await releasePayment(dispute.order_id, adminId, 'admin', supabase);
+    if (!rel.success) return rel;
     // Store split override for payment processing
     await supabase
       .from('escrow_transactions')
       .update({ release_reason: `split:${splitSellerPercent}` })
       .eq('id', dispute.escrow_transaction_id);
+  }
+
+  // Efeito financeiro concluído — só agora a disputa é marcada como resolvida.
+  const { error: resolveError } = await supabase
+    .from('disputes')
+    .update({
+      status: 'resolved',
+      resolution,
+      split_seller_percent: resolution === 'split' ? splitSellerPercent : null,
+      resolved_by: adminId,
+      resolved_at: resolvedAt,
+      admin_notes: adminNotes ?? null,
+    })
+    .eq('id', disputeId);
+
+  if (resolveError) {
+    return { success: false, error: 'Erro ao registrar resolução: ' + resolveError.message };
   }
 
   if (order) {
@@ -654,7 +707,7 @@ export async function resolveDispute(
  * Sends reminder notifications at 48h and 24h before auto-release.
  */
 export async function autoReleaseCheck(): Promise<{ released: number; reminders48h: number; reminders24h: number }> {
-  const supabase = createServerSupabase();
+  const supabase = getServiceClient();
   const now = new Date();
   let released = 0;
   let reminders48h = 0;
@@ -755,7 +808,7 @@ export async function autoReleaseCheck(): Promise<{ released: number; reminders4
 // ==================== HELPERS ====================
 
 async function recordQRAttempt(
-  supabase: ReturnType<typeof createServerSupabase>,
+  supabase: EscrowClient,
   orderId: string,
   buyerId: string | null,
   success: boolean,
@@ -781,7 +834,7 @@ export async function getEscrowDetails(orderId: string): Promise<{
   logs: Record<string, unknown>[];
   dispute: Record<string, unknown> | null;
 }> {
-  const supabase = createServerSupabase();
+  const supabase = getServiceClient();
 
   const { data: transaction } = await supabase
     .from('escrow_transactions')
@@ -817,7 +870,7 @@ export async function regenerateQR(
   orderId: string,
   sellerId: string
 ): Promise<EscrowActionResult> {
-  const supabase = createServerSupabase();
+  const supabase = getServiceClient();
 
   const { data: escrow } = await supabase
     .from('escrow_transactions')
