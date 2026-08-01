@@ -131,29 +131,24 @@ export default function CheckoutPage() {
         method: paymentMethod,
         totalAmount: finalPrice,
         installments: paymentMethod === 'credit' ? installments : undefined,
+        deliveryType: deliveryType === 'pickup' ? 'local_pickup' : 'partner_delivery',
         split: { ...split, sellerId: product.sellerId, totalAmount: finalPrice },
         card: paymentMethod === 'credit' ? cardData : undefined,
       });
 
       if (result.success) {
-        // Criar pedido no banco e notificar vendedor
-        const orderRes = await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            product_id: product.id,
-            seller_id: product.sellerId,
-            amount: finalPrice,
-            delivery_type: deliveryType,
-            payment_method: paymentMethod,
-            installments: paymentMethod === 'credit' ? installments : 1,
-            payment_id: (result as any).transactionId || null,
-            coupon_code: couponResult?.valid ? couponCode : null,
-            coupon_discount: couponDiscount,
-          }),
-        });
-        if (!orderRes.ok) {
-          console.warn('[checkout] order creation failed:', await orderRes.text());
+        // O pedido já é persistido por /api/payments/create (fonte única de verdade).
+        // Aqui apenas registramos o cupom aplicado, quando houver.
+        if (result.orderId && couponResult?.valid && couponCode) {
+          fetch('/api/orders', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: result.orderId,
+              coupon_code: couponCode,
+              coupon_discount: couponDiscount,
+            }),
+          }).catch((e) => console.warn('[checkout] falha ao registrar cupom:', e));
         }
 
         if (result.status === 'pending' && result.pixQrCode) {

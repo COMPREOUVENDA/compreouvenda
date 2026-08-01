@@ -6,8 +6,8 @@
  */
 
 const PAGBANK_BASE_URL = process.env.PAGBANK_ENV === 'production'
-  ? 'https://api.pagbank.com.br'
-  : 'https://sandbox.api.pagbank.com.br'
+  ? 'https://api.pagseguro.com'
+  : 'https://sandbox.api.pagseguro.com'
 
 const PAGBANK_TOKEN = process.env.PAGBANK_TOKEN || ''
 

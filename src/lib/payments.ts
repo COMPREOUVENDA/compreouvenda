@@ -46,6 +46,7 @@ export interface CreatePaymentParams {
   method: 'pix' | 'credit';
   totalAmount: number;
   installments?: number;
+  deliveryType?: string;
   split: SplitResult & { sellerId: string; totalAmount: number };
   card?: CardData;
 }
@@ -100,16 +101,12 @@ export async function createPayment(params: CreatePaymentParams): Promise<Paymen
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      productId:       params.productId,
-      amount:          params.totalAmount,
-      paymentMethod:   params.method,
-      cardData:        params.card,
-      sellerId:        params.sellerId,
-      installments:    params.installments ?? 1,
-      // passa split para o backend usar no split de pagamento PagBank
-      splitPlatformFee:   params.split.platformFee,
-      splitGatewayFee:    params.split.gatewayFee,
-      splitSellerAmount:  params.split.sellerAmount,
+      productId:     params.productId,
+      // O método é normalizado no servidor ('pix' | 'PIX' | 'credit' | 'CREDIT_CARD').
+      paymentMethod: params.method === 'pix' ? 'PIX' : 'CREDIT_CARD',
+      cardData:      params.card ? { ...params.card, installments: params.installments ?? 1 } : undefined,
+      installments:  params.installments ?? 1,
+      deliveryType:  params.deliveryType,
     }),
   });
 
@@ -124,18 +121,20 @@ export async function createPayment(params: CreatePaymentParams): Promise<Paymen
   }
 
   // Normaliza a resposta da rota /api/payments/create
-  const isPix = params.method === 'pix';
-  const hasPix = !!(data.pixData?.qrCode || data.pixData?.copyPaste);
+  const qrCode    = data.pixData?.qrCode    ?? data.pixData?.qrCodeImage;
+  const copyPaste = data.pixData?.copyPaste ?? data.pixData?.qrCodeText;
+  const hasPix    = !!(qrCode || copyPaste);
+  const isPaid    = data.status === 'PAID' || data.status === 'AUTHORIZED';
 
   return {
-    success:       data.success ?? true,
-    status:        hasPix ? 'pending' : 'approved',
-    orderId:       data.orderId,
+    success:        data.success ?? true,
+    status:         hasPix ? 'pending' : (isPaid ? 'approved' : 'pending'),
+    orderId:        data.orderId,
     pagbankOrderId: data.pagbankOrderId,
-    transactionId: data.pagbankOrderId || data.orderId,
-    pixQrCode:     data.pixData?.qrCode,
-    pixCopyPaste:  data.pixData?.copyPaste,
-    pixExpiresAt:  data.pixData?.expiresAt,
-    errorMessage:  data.error,
+    transactionId:  data.chargeId || data.pagbankOrderId || data.orderId,
+    pixQrCode:      qrCode,
+    pixCopyPaste:   copyPaste,
+    pixExpiresAt:   data.pixData?.expiresAt,
+    errorMessage:   data.error,
   };
 }
