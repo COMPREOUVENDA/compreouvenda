@@ -23,7 +23,7 @@ export default function AdminLoginPage() {
         const { data: profile } = await supabase
           .from('users')
           .select('role')
-          .eq('id', user.id)
+          .eq('auth_id', user.id)
           .single();
         if (profile?.role === 'admin' || profile?.role === 'super_admin') {
           router.replace('/admin');
@@ -64,13 +64,13 @@ export default function AdminLoginPage() {
         return;
       }
 
-      // Check admin role - try by id first, then by email as fallback
+      // Check admin role - try by auth_id first, then by email as fallback
       let isAdmin = false;
-      
+
       const { data: profile } = await supabase
         .from('users')
         .select('role')
-        .eq('id', data.user.id)
+        .eq('auth_id', data.user.id)
         .single();
 
       if (profile?.role === 'admin' || profile?.role === 'super_admin') {
@@ -84,15 +84,10 @@ export default function AdminLoginPage() {
           .select('role')
           .eq('email', data.user.email)
           .single();
-        
+
         if (profileByEmail?.role === 'admin' || profileByEmail?.role === 'super_admin') {
           isAdmin = true;
         }
-      }
-
-      // Also allow the main admin email directly
-      if (!isAdmin && data.user.email === 'teste@compreouvenda.com') {
-        isAdmin = true;
       }
 
       if (!isAdmin) {
