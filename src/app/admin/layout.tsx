@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Users, Package, Video, CreditCard, GitBranch, Users2,
   HandHeart, Heart, MapPin, Gavel, Zap, Flag, LifeBuoy, Bell, FileText,
   Settings, Shield, ScrollText, Menu, X, LogOut, ChevronDown, TrendingUp,
-  ShieldCheck, Sparkles, Tag, Crown, Globe, Store,
+  ShieldCheck, Sparkles, Tag, Crown, Globe, Store, Gem, Ticket, Megaphone, QrCode,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -40,7 +40,11 @@ const MENU_ITEMS: {
   { id: 'coupons', label: 'Cupons', icon: Tag, href: '/admin/coupons' },
   { id: 'subscriptions', label: 'Assinaturas', icon: Crown, href: '/admin/subscriptions' },
 
-  { id: 'partners', label: 'Parceiros', icon: Store, href: '/admin/partners', section: 'Clube de Benefícios' },
+  { id: 'club', label: 'Visão do Clube', icon: Gem, href: '/admin/club', section: 'Clube de Benefícios' },
+  { id: 'partners', label: 'Parceiros', icon: Store, href: '/admin/partners' },
+  { id: 'benefits', label: 'Benefícios', icon: Ticket, href: '/admin/benefits' },
+  { id: 'campaigns', label: 'Campanhas', icon: Megaphone, href: '/admin/campaigns' },
+  { id: 'redemptions', label: 'Validações', icon: QrCode, href: '/admin/redemptions' },
 
   { id: 'reports', label: 'Denúncias', icon: Flag, href: '/admin/reports', section: 'Operação' },
   { id: 'support', label: 'Suporte', icon: LifeBuoy, href: '/admin/support' },
