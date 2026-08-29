@@ -25,38 +25,23 @@ export default function AdminGuard({ children }: AdminGuardProps) {
     const check = async () => {
       try {
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { session } } = await supabase.auth.getSession();
 
-        if (!user) {
+        if (!session?.user) {
           router.replace('/admin/login');
           return;
         }
 
-        // Check by auth_id (users table FK to auth.users)
-        const { data: profile } = await supabase
-          .from('users')
-          .select('role')
-          .eq('auth_id', user.id)
-          .single();
+        // Fonte única de verdade: admin_users, resolvida no servidor.
+        // O token vai no header porque o cookie pode não estar disponível
+        // logo após o login no cliente.
+        const res = await fetch('/api/admin/me', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          cache: 'no-store',
+        });
+        const data = await res.json();
 
-        if (profile?.role === 'admin' || profile?.role === 'super_admin') {
-          setStatus('authorized');
-          return;
-        }
-
-        // Fallback: check by email
-        const { data: profileByEmail } = await supabase
-          .from('users')
-          .select('role')
-          .eq('email', user.email)
-          .single();
-
-        if (profileByEmail?.role === 'admin' || profileByEmail?.role === 'super_admin') {
-          setStatus('authorized');
-          return;
-        }
-
-        setStatus('denied');
+        setStatus(data?.isAdmin ? 'authorized' : 'denied');
       } catch {
         router.replace('/admin/login');
       }

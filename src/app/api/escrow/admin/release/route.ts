@@ -1,28 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserId, getServiceClient } from '@/lib/api-auth';
+import { getServiceClient, requireAdmin } from '@/lib/api-auth';
 import { releasePayment } from '@/lib/escrow';
 
 export async function POST(req: NextRequest) {
   try {
-    const authUserId = await getAuthUserId(req);
+    // Liberar dinheiro retido é uma operação financeira.
+    const admin = await requireAdmin(req, ['admin_financial']);
+    if (admin instanceof NextResponse) return admin;
 
-    if (!authUserId) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
-    }
-
-    // Verify admin — `is_active` precisa ser checado, senão um admin
-    // desativado continua conseguindo liberar pagamentos.
     const supabase = getServiceClient();
-    const { data: admin } = await supabase
-      .from('admin_users')
-      .select('id, role, is_active')
-      .eq('auth_id', authUserId)
-      .eq('is_active', true)
-      .single();
-
-    if (!admin) {
-      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
-    }
 
     const body = await req.json() as { orderId?: string; reason?: string };
     const { orderId, reason } = body;

@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 import { cleanEnv } from '@/lib/env';
@@ -55,6 +56,95 @@ export async function getPublicProfile(authUserId: string, columns = 'id, name, 
     .eq('auth_id', authUserId)
     .single();
   return data as Record<string, any> | null;
+}
+
+// ─── Autorização administrativa ───────────────────────────────────────────
+//
+// FONTE ÚNICA DE VERDADE: a tabela `public.admin_users`.
+//
+// O projeto tinha dois mecanismos concorrentes e dessincronizados: o painel
+// checava `public.users.role` enquanto as rotas de escrow checavam
+// `public.admin_users`. Isso permitia que uma conta fosse admin em um lado e
+// não no outro, e ignorava o `is_active` (revogação) em metade do sistema.
+// Toda verificação de privilégio administrativo passa a usar este módulo.
+
+export const ADMIN_ROLES = [
+  'super_admin',
+  'admin_operational',
+  'admin_financial',
+  'admin_support',
+  'admin_moderation',
+  'admin_content',
+] as const;
+
+export type AdminRole = (typeof ADMIN_ROLES)[number];
+
+export interface AdminIdentity {
+  id: string;
+  authId: string;
+  email: string;
+  name: string | null;
+  role: AdminRole;
+}
+
+/**
+ * Resolve a identidade administrativa do usuário autenticado.
+ * Retorna `null` quando não há sessão, quando a conta não é admin ou quando o
+ * acesso foi revogado (`is_active = false`).
+ */
+export async function getAdminIdentity(request: NextRequest): Promise<AdminIdentity | null> {
+  const authUserId = await getAuthUserId(request);
+  if (!authUserId) return null;
+
+  const { data } = await getServiceClient()
+    .from('admin_users')
+    .select('id, auth_id, email, name, role, is_active')
+    .eq('auth_id', authUserId)
+    .eq('is_active', true)
+    .single();
+
+  if (!data) return null;
+
+  return {
+    id: data.id as string,
+    authId: data.auth_id as string,
+    email: data.email as string,
+    name: (data.name as string | null) ?? null,
+    role: data.role as AdminRole,
+  };
+}
+
+/**
+ * Guarda de rota. Devolve a identidade do admin ou uma `NextResponse` de erro
+ * pronta para retornar (401 sem sessão, 403 sem privilégio suficiente).
+ *
+ * `super_admin` sempre passa, independentemente de `allowedRoles`.
+ *
+ *   const admin = await requireAdmin(req, ['admin_financial']);
+ *   if (admin instanceof NextResponse) return admin;
+ */
+export async function requireAdmin(
+  request: NextRequest,
+  allowedRoles?: readonly AdminRole[]
+): Promise<AdminIdentity | NextResponse> {
+  const authUserId = await getAuthUserId(request);
+  if (!authUserId) {
+    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+  }
+
+  const admin = await getAdminIdentity(request);
+  if (!admin) {
+    return NextResponse.json({ error: 'Acesso restrito a administradores' }, { status: 403 });
+  }
+
+  if (allowedRoles?.length && admin.role !== 'super_admin' && !allowedRoles.includes(admin.role)) {
+    return NextResponse.json(
+      { error: 'Seu perfil administrativo não permite esta operação', role: admin.role },
+      { status: 403 }
+    );
+  }
+
+  return admin;
 }
 
 /** Valida CPF (11 dígitos) ou CNPJ (14 dígitos) usando os dígitos verificadores. */

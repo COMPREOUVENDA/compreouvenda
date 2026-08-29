@@ -1,28 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserId, getServiceClient } from '@/lib/api-auth';
+import { requireAdmin } from '@/lib/api-auth';
 import { resolveDispute } from '@/lib/escrow';
 
 export async function POST(req: NextRequest) {
   try {
-    const authUserId = await getAuthUserId(req);
-
-    if (!authUserId) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
-    }
-
-    // Verify admin — `is_active` precisa ser checado, senão um admin
-    // desativado continua conseguindo resolver disputas.
-    const supabase = getServiceClient();
-    const { data: admin } = await supabase
-      .from('admin_users')
-      .select('id, is_active')
-      .eq('auth_id', authUserId)
-      .eq('is_active', true)
-      .single();
-
-    if (!admin) {
-      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
-    }
+    // Resolver disputa move dinheiro: financeiro ou suporte.
+    const admin = await requireAdmin(req, ['admin_financial', 'admin_support']);
+    if (admin instanceof NextResponse) return admin;
 
     const body = await req.json() as {
       disputeId?: string;

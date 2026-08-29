@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { cleanEnv } from '@/lib/env';
+import { getServiceClient, requireAdmin } from '@/lib/api-auth';
 
 export async function POST(req: NextRequest) {
   try {
+    // Remoção definitiva de conta é destrutiva: restrita a super_admin.
+    const admin = await requireAdmin(req, []);
+    if (admin instanceof NextResponse) return admin;
+    if (admin.role !== 'super_admin') {
+      return NextResponse.json(
+        { error: 'Apenas um super_admin pode excluir contas', role: admin.role },
+        { status: 403 }
+      );
+    }
+
     const { userId, authId, reason } = await req.json() as {
       userId: string;
       authId: string;
@@ -14,35 +23,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'userId and authId are required' }, { status: 400 });
     }
 
-    // Use service role key for admin operations
-    const supabaseAdmin = createClient(
-      cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL),
-      cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY)
-    );
-
-    // Verify the caller is an admin (check session via auth header)
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user: caller }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !caller) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check caller is admin
-    const { data: callerProfile } = await supabaseAdmin
-      .from('users')
-      .select('role')
-      .eq('auth_id', caller.id)
-      .single();
-
-    if (callerProfile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
+    const supabaseAdmin = getServiceClient();
     // 1. Delete favorites
     await supabaseAdmin.from('favorites').delete().eq('user_id', userId);
 

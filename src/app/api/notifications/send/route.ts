@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { sendPushNotification, sendBulkNotification, type PushNotification, type NotificationType } from '@/lib/push-notifications';
 import { cleanEnv } from '@/lib/env';
+import { requireAdmin } from '@/lib/api-auth';
 
 function createClient() {
   const cookieStore = cookies();
@@ -40,20 +41,10 @@ export async function POST(req: NextRequest) {
     const cronHeader = req.headers.get('x-cron-secret') === process.env.CRON_SECRET;
 
     if (!isCron && !cronHeader) {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-      // Check admin role — usar auth_id (UUID do auth) não id (UUID interno)
-      const { data: profile } = await supabase
-        .from('users')
-        .select('role')
-        .eq('auth_id', user.id)
-        .single();
-
-      if (profile?.role !== 'admin') {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
+      // Fonte única: admin_users. Envio de notificação em massa é operacional
+      // ou de conteúdo — super_admin sempre passa.
+      const admin = await requireAdmin(req, ['admin_operational', 'admin_content']);
+      if (admin instanceof NextResponse) return admin;
     }
 
     if (!notification?.title || !notification?.body) {

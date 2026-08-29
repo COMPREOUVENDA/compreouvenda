@@ -18,17 +18,15 @@ export default function AdminLoginPage() {
   useEffect(() => {
     const checkExisting = async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('role')
-          .eq('auth_id', user.id)
-          .single();
-        if (profile?.role === 'admin' || profile?.role === 'super_admin') {
-          router.replace('/admin');
-        }
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const res = await fetch('/api/admin/me', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store',
+      });
+      const info = await res.json();
+      if (info?.isAdmin) router.replace('/admin');
     };
     checkExisting();
   }, [router]);
@@ -64,33 +62,15 @@ export default function AdminLoginPage() {
         return;
       }
 
-      // Check admin role - try by auth_id first, then by email as fallback
-      let isAdmin = false;
+      // Privilégio administrativo é decidido no servidor a partir de
+      // admin_users (fonte única), respeitando is_active.
+      const res = await fetch('/api/admin/me', {
+        headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}` },
+        cache: 'no-store',
+      });
+      const info = await res.json();
 
-      const { data: profile } = await supabase
-        .from('users')
-        .select('role')
-        .eq('auth_id', data.user.id)
-        .single();
-
-      if (profile?.role === 'admin' || profile?.role === 'super_admin') {
-        isAdmin = true;
-      }
-
-      // Fallback: check by email
-      if (!isAdmin) {
-        const { data: profileByEmail } = await supabase
-          .from('users')
-          .select('role')
-          .eq('email', data.user.email)
-          .single();
-
-        if (profileByEmail?.role === 'admin' || profileByEmail?.role === 'super_admin') {
-          isAdmin = true;
-        }
-      }
-
-      if (!isAdmin) {
+      if (!info?.isAdmin) {
         await supabase.auth.signOut();
         setError('Acesso negado — Permissão insuficiente. Sua conta não é administrador.');
         return;
