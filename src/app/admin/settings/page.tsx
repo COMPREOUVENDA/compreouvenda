@@ -3,24 +3,26 @@
 import { useState, useEffect } from 'react';
 import { Settings, Save, Loader2, Check, Lock, Eye, EyeOff, AlertCircle, MapPin, ToggleLeft, ToggleRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { adminFetchJson } from '@/lib/admin-fetch';
 
-const DEFAULT_SETTINGS = [
-  { key: 'platform_fee_percent', label: 'Taxa da Plataforma (%)', value: '10', type: 'number' },
-  { key: 'max_photos', label: 'Máximo de Fotos por Produto', value: '8', type: 'number' },
-  { key: 'max_video_duration', label: 'Duração Máxima do Vídeo (s)', value: '20', type: 'number' },
-  { key: 'max_radius_km', label: 'Raio Máximo de Negociação (km)', value: '100', type: 'number' },
-  { key: 'video_daily_limit', label: 'Limite Diário de Vídeos', value: '5', type: 'number' },
-  { key: 'commission_min', label: 'Comissão Mínima (%)', value: '1', type: 'number' },
-  { key: 'commission_max', label: 'Comissão Máxima (%)', value: '30', type: 'number' },
-  { key: 'gateway_fee', label: 'Taxa do Gateway (%)', value: '2.5', type: 'number' },
-  { key: 'pix_discount', label: 'Desconto PIX (%)', value: '5', type: 'number' },
-];
+// As configurações vêm de `system_settings` no banco. A UI antiga usava chaves
+// próprias e gravava numa tabela `settings` inexistente, então nada era salvo.
+interface SettingRow {
+  key: string;
+  value: number | string;
+  description: string | null;
+  label: string;
+  min: number | null;
+  max: number | null;
+}
 
 // ─── Chave do localStorage para o toggle de geolocalização ────────────────────
 const GEO_REQUIRED_KEY = 'geo_required';
 
 export default function AdminSettingsPage() {
   const [values, setValues] = useState<Record<string, string>>({});
+  const [rows, setRows] = useState<SettingRow[]>([]);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -49,23 +51,19 @@ export default function AdminSettingsPage() {
   });
 
   useEffect(() => {
-    const defaults: Record<string, string> = {};
-    DEFAULT_SETTINGS.forEach((s) => { defaults[s.key] = s.value; });
-
     const fetchSettings = async () => {
       setLoading(true);
+      setSettingsError(null);
       try {
-        const supabase = createClient();
-        const { data } = await supabase.from('settings').select('key, value');
-        if (data && data.length > 0) {
-          const fromDb: Record<string, string> = { ...defaults };
-          data.forEach((row: { key: string; value: string }) => { fromDb[row.key] = row.value; });
-          setValues(fromDb);
-        } else {
-          setValues(defaults);
-        }
-      } catch {
-        setValues(defaults);
+        const data = await adminFetchJson<{ settings: SettingRow[] }>('/api/admin/settings');
+        setRows(data.settings);
+        const next: Record<string, string> = {};
+        data.settings.forEach((s) => { next[s.key] = String(s.value); });
+        setValues(next);
+      } catch (e) {
+        setSettingsError(e instanceof Error ? e.message : 'Erro ao carregar configurações');
+        setRows([]);
+        setValues({});
       } finally {
         setLoading(false);
       }
@@ -76,19 +74,34 @@ export default function AdminSettingsPage() {
 
   const handleSave = async () => {
     setSaving(true);
+    setSettingsError(null);
     try {
-      const supabase = createClient();
-      const rows = Object.entries(values).map(([key, value]) => ({ key, value }));
-      const { error } = await supabase
-        .from('settings')
-        .upsert(rows, { onConflict: 'key' });
+      const payload: Record<string, number> = {};
+      rows.forEach((r) => {
+        const raw = values[r.key];
+        if (raw === undefined || raw === '') return;
+        const num = Number(raw);
+        if (!Number.isNaN(num) && num !== Number(r.value)) payload[r.key] = num;
+      });
 
-      if (error) throw error;
+      if (Object.keys(payload).length === 0) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+        return;
+      }
+
+      const data = await adminFetchJson<{ settings: SettingRow[] }>('/api/admin/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ settings: payload }),
+      });
+      setRows(data.settings);
+      const next: Record<string, string> = {};
+      data.settings.forEach((s) => { next[s.key] = String(s.value); });
+      setValues(next);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      setSettingsError(e instanceof Error ? e.message : 'Não foi possível salvar as configurações');
     } finally {
       setSaving(false);
     }
@@ -267,12 +280,32 @@ export default function AdminSettingsPage() {
           <Settings className="w-5 h-5 text-gray-400" /> Configurações do Sistema
         </h3>
         <div className="space-y-4">
-          {DEFAULT_SETTINGS.map((s) => (
+          {loading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="w-5 h-5 text-brand-purple animate-spin" />
+            </div>
+          ) : settingsError ? (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-300">{settingsError}</p>
+            </div>
+          ) : rows.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-8">Nenhuma configuração encontrada.</p>
+          ) : rows.map((s) => (
             <div key={s.key} className="flex items-center justify-between gap-4">
-              <label className="text-sm text-gray-300 flex-1">{s.label}</label>
+              <label className="text-sm text-gray-300 flex-1">
+                {s.label}
+                {(s.min !== null || s.max !== null) && (
+                  <span className="block text-[11px] text-gray-500">
+                    Permitido: {s.min ?? 0} a {s.max ?? '∞'}
+                  </span>
+                )}
+              </label>
               <input
-                type={s.type}
-                value={values[s.key] ?? s.value}
+                type="number"
+                min={s.min ?? undefined}
+                max={s.max ?? undefined}
+                value={values[s.key] ?? ''}
                 onChange={(e) => setValues((prev) => ({ ...prev, [s.key]: e.target.value }))}
                 className="w-28 px-3 py-2 bg-gray-700 border border-gray-600 rounded-xl text-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-brand-purple/50"
               />
@@ -281,7 +314,7 @@ export default function AdminSettingsPage() {
         </div>
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || loading || rows.length === 0}
           className="mt-6 w-full bg-brand-purple text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-brand-purple/90 transition-colors disabled:opacity-60"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
