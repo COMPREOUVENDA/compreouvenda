@@ -17,29 +17,35 @@ const supabase = createClient(
 );
 
 async function getImpactData() {
+  // Schema real de `donations`: o valor efetivo é `calculated_amount` e os
+  // status permitidos são pending | confirmed | transferred | failed.
+  // `charities` não possui city/state.
+  const CONFIRMED = ['confirmed', 'transferred'];
+
   const [donationsRes, charitiesRes, statsRes] = await Promise.all([
     supabase
       .from('donations')
-      .select('amount, created_at, charity:charities(name, category, logo_url)')
-      .eq('status', 'completed')
+      .select('calculated_amount, donation_value, created_at, charity:charities(name, category, logo_url)')
+      .in('status', CONFIRMED)
       .order('created_at', { ascending: false })
       .limit(20),
     supabase
       .from('charities')
-      .select('id, name, category, logo_url, description, city, state')
+      .select('id, name, category, logo_url, description')
       .eq('active', true)
       .order('name'),
     supabase
       .from('donations')
-      .select('amount')
-      .eq('status', 'completed'),
+      .select('calculated_amount, donation_value')
+      .in('status', CONFIRMED),
   ]);
 
   const donations = donationsRes.data || [];
   const charities = charitiesRes.data || [];
   const allDonations = statsRes.data || [];
 
-  const totalDonated = allDonations.reduce((s: number, d: any) => s + (d.amount || 0), 0);
+  const amountOf = (d: any) => Number(d.calculated_amount ?? d.donation_value ?? 0);
+  const totalDonated = allDonations.reduce((s: number, d: any) => s + amountOf(d), 0);
 
   return { donations, charities, totalDonated, totalTransactions: allDonations.length };
 }
@@ -54,6 +60,17 @@ const CATEGORY_ICONS: Record<string, string> = {
   food: '🍽️',
   culture: '🎭',
   default: '🤝',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  education: 'Educação',
+  environment: 'Meio ambiente',
+  health: 'Saúde',
+  animals: 'Animais',
+  children: 'Infância',
+  elderly: 'Idosos',
+  food: 'Combate à fome',
+  culture: 'Cultura',
 };
 
 export default async function ImpactPage() {
@@ -102,8 +119,8 @@ export default async function ImpactPage() {
           },
           {
             icon: Globe,
-            label: 'Cidades',
-            value: `${new Set(charities.map((c: any) => c.city).filter(Boolean)).size}`,
+            label: 'Causas atendidas',
+            value: `${new Set(charities.map((c: any) => c.category).filter(Boolean)).size}`,
             color: 'text-brand-orange',
             bg: 'bg-brand-orange/10',
           },
@@ -167,9 +184,9 @@ export default async function ImpactPage() {
                   {charity.description && (
                     <p className="text-xs text-gray-500 mt-0.5 leading-relaxed line-clamp-2">{charity.description}</p>
                   )}
-                  {(charity.city || charity.state) && (
+                  {charity.category && (
                     <p className="text-xs text-gray-400 mt-1">
-                      📍 {[charity.city, charity.state].filter(Boolean).join(', ')}
+                      {CATEGORY_ICONS[charity.category] || '🤝'} {CATEGORY_LABELS[charity.category] || charity.category}
                     </p>
                   )}
                 </div>
@@ -203,7 +220,7 @@ export default async function ImpactPage() {
                     </div>
                   </div>
                   <span className="text-sm font-bold text-emerald-600">
-                    +R$ {(d.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    +R$ {Number(d.calculated_amount ?? d.donation_value ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               ))}

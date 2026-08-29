@@ -96,18 +96,23 @@ export function useSellerProfile() {
         };
       } else {
         // Calcular na hora se não houver cache
+        // `orders` não tem coluna `status`: o pagamento liberado é o que
+        // caracteriza uma venda concluída.
         const { count: soldCount } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
           .eq('seller_id', sellerId)
-          .eq('status', 'completed');
+          .in('payment_status', ['paid', 'released']);
 
+        // A doação é registrada no próprio pedido; `donations` só existe
+        // quando o vendedor vincula uma instituição ao anúncio.
         const { data: donationsData } = await supabase
-          .from('donations')
-          .select('amount')
-          .eq('seller_id', sellerId);
+          .from('orders')
+          .select('donation_value')
+          .eq('seller_id', sellerId)
+          .in('payment_status', ['paid', 'released']);
 
-        const totalDonated = (donationsData || []).reduce((sum, d) => sum + (d.amount || 0), 0);
+        const totalDonated = (donationsData || []).reduce((sum, d) => sum + Number(d.donation_value || 0), 0);
         const avgRating =
           reviews.length > 0
             ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length

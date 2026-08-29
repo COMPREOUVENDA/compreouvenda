@@ -88,14 +88,16 @@ export default function SellerProfilePage({ params }: { params: { id: string } }
       .from('orders')
       .select('*', { count: 'exact', head: true })
       .eq('seller_id', params.id)
-      .eq('status', 'completed');
+      .in('payment_status', ['paid', 'released']);
 
+    // `orders` não tem `status`; a doação fica em `orders.donation_value`.
     const { data: donationsData } = await supabase
-      .from('donations')
-      .select('amount')
-      .eq('seller_id', params.id);
+      .from('orders')
+      .select('donation_value')
+      .eq('seller_id', params.id)
+      .in('payment_status', ['paid', 'released']);
 
-    const totalDonated = (donationsData || []).reduce((sum, d) => sum + (d.amount || 0), 0);
+    const totalDonated = (donationsData || []).reduce((sum, d) => sum + Number(d.donation_value || 0), 0);
 
     const avgRating = reviewsData && reviewsData.length > 0
       ? reviewsData.reduce((sum, r: Review) => sum + r.rating, 0) / reviewsData.length
