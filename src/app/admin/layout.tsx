@@ -8,13 +8,18 @@ import {
   LayoutDashboard, Users, Package, Video, CreditCard, GitBranch, Users2,
   HandHeart, Heart, MapPin, Gavel, Zap, Flag, LifeBuoy, Bell, FileText,
   Settings, Shield, ScrollText, Menu, X, LogOut, ChevronDown, TrendingUp,
-  ShieldCheck, Sparkles, Tag, Crown, Globe,
+  ShieldCheck, Sparkles, Tag, Crown, Globe, Store,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import AdminGuard from './AdminGuard';
 
-const MENU_ITEMS = [
+// `section` é opcional: itens sem seção continuam renderizando exatamente como
+// antes. O rótulo aparece apenas quando a seção muda, agrupando o Centro de
+// Controle sem alterar a navegação já existente.
+const MENU_ITEMS: {
+  id: string; label: string; icon: React.ElementType; href: string; section?: string;
+}[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/admin' },
   { id: 'commercial', label: 'Comercial', icon: TrendingUp, href: '/admin/commercial' },
   { id: 'users', label: 'Usuários', icon: Users, href: '/admin/users' },
@@ -34,7 +39,10 @@ const MENU_ITEMS = [
   { id: 'flash', label: 'Ofertas Flash', icon: Zap, href: '/admin/flash-offers' },
   { id: 'coupons', label: 'Cupons', icon: Tag, href: '/admin/coupons' },
   { id: 'subscriptions', label: 'Assinaturas', icon: Crown, href: '/admin/subscriptions' },
-  { id: 'reports', label: 'Denúncias', icon: Flag, href: '/admin/reports' },
+
+  { id: 'partners', label: 'Parceiros', icon: Store, href: '/admin/partners', section: 'Clube de Benefícios' },
+
+  { id: 'reports', label: 'Denúncias', icon: Flag, href: '/admin/reports', section: 'Operação' },
   { id: 'support', label: 'Suporte', icon: LifeBuoy, href: '/admin/support' },
   { id: 'notifications', label: 'Notificações', icon: Bell, href: '/admin/notifications' },
   { id: 'settings', label: 'Configurações', icon: Settings, href: '/admin/settings' },
@@ -77,21 +85,27 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
 
         {/* Menu */}
         <nav className="p-3 space-y-0.5 overflow-y-auto h-[calc(100vh-140px)] scrollbar-hide">
-          {MENU_ITEMS.map((item) => (
-            <Link
-              key={item.id}
-              href={item.href}
-              onClick={() => setSidebarOpen(false)}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
-                activeId === item.id
-                  ? 'bg-brand-purple text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+          {MENU_ITEMS.map((item, i) => (
+            <div key={item.id}>
+              {item.section && i > 0 && (
+                <p className="px-3 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-600">
+                  {item.section}
+                </p>
               )}
-            >
-              <item.icon className="w-4 h-4 flex-shrink-0" />
-              {item.label}
-            </Link>
+              <Link
+                href={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
+                  activeId === item.id
+                    ? 'bg-brand-purple text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                )}
+              >
+                <item.icon className="w-4 h-4 flex-shrink-0" />
+                {item.label}
+              </Link>
+            </div>
           ))}
         </nav>
 
