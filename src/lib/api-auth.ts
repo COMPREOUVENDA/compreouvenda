@@ -177,3 +177,122 @@ export function isValidTaxId(raw: string | null | undefined): boolean {
 
   return false;
 }
+
+// ─── Autorização do Portal do Parceiro ────────────────────────────────────
+//
+// Não existe autenticação paralela: o parceiro loga com a mesma conta
+// `public.users` do marketplace. O vínculo com a empresa vive em
+// `partner_members`, que é a única fonte de verdade sobre quem pode operar
+// qual empresa e com qual nível de permissão.
+//
+// Hierarquia: owner > manager > operator.
+//   owner    — cadastro da empresa, documentos, equipe, plano
+//   manager   — benefícios, campanhas, unidades, relatórios
+//   operator — apenas validação de benefícios no balcão
+
+export const PARTNER_ROLES = ['owner', 'manager', 'operator'] as const;
+export type PartnerRole = (typeof PARTNER_ROLES)[number];
+
+/** `owner` cobre `manager`, que cobre `operator`. */
+const PARTNER_ROLE_RANK: Record<PartnerRole, number> = { owner: 3, manager: 2, operator: 1 };
+
+export interface PartnerIdentity {
+  /** id em `public.users` (não é o auth uid) */
+  userId: string;
+  authId: string;
+  partnerId: string;
+  partnerName: string;
+  /** status da empresa — o portal fica em modo leitura enquanto não for `approved` */
+  partnerStatus: string;
+  role: PartnerRole;
+  /** quando preenchido, o membro só enxerga esta unidade */
+  unitId: string | null;
+}
+
+/**
+ * Resolve o vínculo do usuário autenticado com uma empresa parceira.
+ * Retorna `null` quando não há sessão ou quando o usuário não é membro ativo
+ * de nenhum parceiro.
+ */
+export async function getPartnerIdentity(request: NextRequest): Promise<PartnerIdentity | null> {
+  const authUserId = await getAuthUserId(request);
+  if (!authUserId) return null;
+
+  const admin = getServiceClient();
+
+  const profile = await getPublicProfile(authUserId, 'id');
+  if (!profile?.id) return null;
+
+  const { data } = await admin
+    .from('partner_members')
+    .select('partner_id, role, unit_id, is_active, partner:partners(id, legal_name, trade_name, status)')
+    .eq('user_id', profile.id)
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!data?.partner_id) return null;
+
+  const partner = Array.isArray(data.partner) ? data.partner[0] : data.partner;
+  if (!partner) return null;
+
+  return {
+    userId: profile.id as string,
+    authId: authUserId,
+    partnerId: data.partner_id as string,
+    partnerName: (partner.trade_name || partner.legal_name) as string,
+    partnerStatus: partner.status as string,
+    role: data.role as PartnerRole,
+    unitId: (data.unit_id as string | null) ?? null,
+  };
+}
+
+/**
+ * Guarda de rota do Portal do Parceiro.
+ *
+ *   const p = await requirePartner(req, 'manager');
+ *   if (p instanceof NextResponse) return p;
+ *
+ * `minRole` aplica a hierarquia: pedir `manager` aceita `manager` e `owner`.
+ * `requireApproved` (padrão `true`) bloqueia escrita enquanto a empresa não
+ * tiver sido aprovada pelo painel administrativo — use `false` nas rotas de
+ * leitura, para que o parceiro em análise ainda consiga acompanhar o cadastro.
+ */
+export async function requirePartner(
+  request: NextRequest,
+  minRole: PartnerRole = 'operator',
+  requireApproved = true
+): Promise<PartnerIdentity | NextResponse> {
+  const authUserId = await getAuthUserId(request);
+  if (!authUserId) {
+    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+  }
+
+  const partner = await getPartnerIdentity(request);
+  if (!partner) {
+    return NextResponse.json(
+      { error: 'Sua conta não está vinculada a nenhuma empresa parceira' },
+      { status: 403 }
+    );
+  }
+
+  if (PARTNER_ROLE_RANK[partner.role] < PARTNER_ROLE_RANK[minRole]) {
+    return NextResponse.json(
+      { error: 'Seu perfil na empresa não permite esta operação', role: partner.role },
+      { status: 403 }
+    );
+  }
+
+  if (requireApproved && partner.partnerStatus !== 'approved') {
+    return NextResponse.json(
+      {
+        error: `A empresa ainda não está aprovada (${partner.partnerStatus}). Aguarde a análise para realizar esta operação.`,
+        partnerStatus: partner.partnerStatus,
+      },
+      { status: 403 }
+    );
+  }
+
+  return partner;
+}
