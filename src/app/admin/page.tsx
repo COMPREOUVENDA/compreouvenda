@@ -5,9 +5,10 @@ import Link from 'next/link';
 import {
   Users, Package, ShoppingCart, Video, DollarSign, HandHeart,
   TrendingUp, Zap, RefreshCw, Loader2, ArrowUpRight,
-  Bell, Shield, Star, BarChart3, Activity,
+  Bell, Shield, Star, BarChart3, Activity, Gem,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { adminFetchJson } from '@/lib/admin-fetch';
 
 const supabase = createClient();
 
@@ -25,8 +26,28 @@ interface DashboardStats {
   newProductsToday: number;
 }
 
+interface ClubStats {
+  totalPartners: number;
+  activePartners: number;
+  pendingPartners: number;
+  publishedBenefits: number;
+  redemptions: number;
+  clubUsers: number;
+  newCustomers: number;
+  clubVolume: number;
+}
+
+interface PendingAction {
+  id: string;
+  label: string;
+  count: number;
+  href: string;
+}
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [club, setClub] = useState<ClubStats | null>(null);
+  const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
   const [recentProducts, setRecentProducts] = useState<any[]>([]);
   const [recentUsers, setRecentUsers] = useState<any[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
@@ -85,6 +106,17 @@ export default function AdminDashboard() {
       if (recentProdsRes.data) setRecentProducts(recentProdsRes.data);
       if (recentUsersRes.data) setRecentUsers(recentUsersRes.data);
       if (recentOrdersRes.data) setRecentOrders(recentOrdersRes.data);
+
+      // Clube de Benefícios: consolidado pela rota admin (RLS impede leitura
+      // direta do cliente). Falha aqui não derruba o restante do dashboard.
+      try {
+        const eco = await adminFetchJson<{ club: ClubStats; pendingActions: PendingAction[] }>('/api/admin/stats');
+        setClub(eco.club ?? null);
+        setPendingActions(eco.pendingActions ?? []);
+      } catch (e) {
+        console.error('Falha ao carregar métricas do clube:', e);
+      }
+
       setLastRefresh(new Date());
     } catch (e) {
       console.error('Dashboard fetch error:', e);
@@ -168,6 +200,59 @@ export default function AdminDashboard() {
           Atualizar
         </button>
       </div>
+
+      {/* Pendências que exigem ação do administrador */}
+      {pendingActions.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {pendingActions.map((a) => (
+            <Link
+              key={a.id}
+              href={a.href}
+              className="bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-3 flex items-center justify-between gap-3 hover:bg-amber-500/15 transition-colors"
+            >
+              <span className="text-sm text-amber-200">{a.label}</span>
+              <span className="text-lg font-display font-bold text-amber-500 flex-shrink-0">{a.count}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* Clube de Benefícios — visão consolidada do ecossistema */}
+      {club && club.totalPartners > 0 && (
+        <div className="bg-gray-800 rounded-2xl border border-gray-700 p-5">
+          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <h3 className="font-display font-semibold text-white flex items-center gap-2">
+              <Gem className="w-5 h-5 text-purple-400" /> Clube de Benefícios
+            </h3>
+            <Link href="/admin/club" className="text-xs text-purple-400 hover:underline flex items-center gap-1">
+              Ver métricas completas <ArrowUpRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+            {[
+              { label: 'Parceiros ativos', value: club.activePartners, href: '/admin/partners' },
+              { label: 'Benefícios no ar', value: club.publishedBenefits, href: '/admin/benefits' },
+              { label: 'Utilizações', value: club.redemptions, href: '/admin/redemptions' },
+              { label: 'Usuários do clube', value: club.clubUsers },
+              { label: 'Novos clientes', value: club.newCustomers },
+              {
+                label: 'Volume gerado',
+                value: club.clubVolume.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+              },
+            ].map((m) => {
+              const inner = (
+                <>
+                  <span className="text-[11px] text-gray-500 block">{m.label}</span>
+                  <span className="text-lg font-display font-bold text-white">{m.value}</span>
+                </>
+              );
+              return m.href
+                ? <Link key={m.label} href={m.href} className="block hover:opacity-80 transition-opacity">{inner}</Link>
+                : <div key={m.label}>{inner}</div>;
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Loading skeleton */}
       {loading && !stats && (

@@ -6,19 +6,33 @@ import {
   DollarSign, ShoppingCart, Percent, Megaphone, FileBarChart,
   Crown, Gift, Target, Users, HandHeart, Layers,
   BarChart3, Activity, CheckCircle, Loader2, RefreshCw, AlertTriangle,
-  ArrowUpRight, ArrowDownRight, Package, Info,
+  ArrowUpRight, ArrowDownRight, Package, Info, Wallet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { adminFetchJson } from '@/lib/admin-fetch';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+  { id: 'finance', label: 'Central Financeira', icon: Wallet },
   { id: 'fees', label: 'Taxas & Repasses', icon: Percent },
   { id: 'plans', label: 'Planos & Serviços', icon: Crown },
   { id: 'ads', label: 'Destaques Pagos', icon: Megaphone },
   { id: 'reports', label: 'Relatórios', icon: FileBarChart },
   { id: 'coupons', label: 'Cupons', icon: Gift },
 ];
+
+/** Fonte de receita consolidada na Central Financeira. */
+interface Stream {
+  id: string; label: string; description: string; origin: string;
+  total: number; month: number; active: boolean; share: number;
+}
+
+interface Finance {
+  streams: Stream[];
+  totalRevenue: number; monthRevenue: number;
+  gatewayCost: number; netRevenue: number; pendingRevenue: number;
+  activeStreams: number; totalStreams: number;
+}
 
 interface Revenue {
   gmvMonth: number; gmvTotal: number; growth: number | null;
@@ -47,6 +61,7 @@ interface ReportRow {
 }
 
 interface Data {
+  finance: Finance;
   revenue: Revenue;
   daily: { day: string; value: number; bar: number }[];
   plans: Plan[];
@@ -295,6 +310,95 @@ export default function AdminCommercialPage() {
               </div>
             </div>
           )}
+
+          {/* ==================== CENTRAL FINANCEIRA ==================== */}
+          {activeTab === 'finance' && (() => {
+            const f = data!.finance;
+            return (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Receita total consolidada', value: brl(f.totalRevenue), tone: 'text-white' },
+                    { label: 'Receita no mês', value: brl(f.monthRevenue), tone: 'text-emerald-500' },
+                    { label: 'Custo de gateway', value: `-${brl(f.gatewayCost)}`, tone: 'text-red-400' },
+                    { label: 'Receita líquida', value: brl(f.netRevenue), tone: 'text-brand-purple' },
+                  ].map((m) => (
+                    <div key={m.label} className="bg-gray-800 rounded-2xl border border-gray-700 p-4">
+                      <span className="text-xs text-gray-400">{m.label}</span>
+                      <p className={`text-2xl font-display font-bold mt-1 ${m.tone}`}>{m.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <h3 className="font-display font-semibold text-white">Fontes de receita</h3>
+                      <p className="text-[11px] text-gray-600 mt-0.5">
+                        {f.activeStreams} de {f.totalStreams} fontes já operacionais. Cada valor é lido
+                        da tabela de origem indicada — não há consolidação duplicada.
+                      </p>
+                    </div>
+                    {f.pendingRevenue > 0 && (
+                      <span className="text-xs text-amber-500">
+                        {brl(f.pendingRevenue)} aguardando confirmação
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="divide-y divide-gray-700/50">
+                    {f.streams.map((s) => (
+                      <div key={s.id} className="px-6 py-4">
+                        <div className="flex items-start justify-between gap-4 flex-wrap">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm text-white font-medium">{s.label}</span>
+                              {!s.active && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-700 text-gray-500">
+                                  sem movimento
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-0.5">{s.description}</p>
+                            <p className="text-[10px] text-gray-600 mt-0.5 font-mono">{s.origin}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-lg font-display font-bold text-white">{brl(s.total)}</p>
+                            <p className="text-xs text-gray-500">
+                              {s.month > 0 ? `${brl(s.month)} no mês` : 'sem receita no mês'}
+                            </p>
+                          </div>
+                        </div>
+                        {f.totalRevenue > 0 && (
+                          <div className="mt-3">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[11px] text-gray-600">participação na receita</span>
+                              <span className="text-[11px] text-gray-500">{s.share}%</span>
+                            </div>
+                            <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                              <div className="h-full bg-brand-purple rounded-full" style={{ width: `${s.share}%` }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-gray-800 border border-gray-700 rounded-2xl px-5 py-4 flex items-start gap-3">
+                  <Wallet className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-gray-300 font-medium">Preparado para o ecossistema de pagamentos</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      A tabela <code className="text-gray-400">revenue_entries</code> já aceita receitas de
+                      serviços financeiros e Smart Split. A operação como subadquirente permanece como
+                      arquitetura futura, condicionada aos requisitos técnicos, comerciais e regulatórios.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ==================== TAXAS ==================== */}
           {activeTab === 'fees' && (

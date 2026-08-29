@@ -53,7 +53,8 @@ export async function GET(req: NextRequest) {
 
   const admin = getServiceClient();
 
-  const [ordersRes, plansRes, subsRes, couponsRes, featuredRes, commissionsRes, usersRes, productsRes] =
+  const [ordersRes, plansRes, subsRes, couponsRes, featuredRes, commissionsRes, usersRes, productsRes,
+         revenueRes, campaignsRes] =
     await Promise.all([
       admin
         .from('orders')
@@ -65,6 +66,9 @@ export async function GET(req: NextRequest) {
       admin.from('commissions').select('*').limit(50),
       admin.from('users').select('id', { count: 'exact', head: true }),
       admin.from('products').select('id', { count: 'exact', head: true }),
+      // Fontes de receita que não possuem tabela própria (clube, publicidade, IA).
+      admin.from('revenue_entries').select('source, gross_value, net_value, status, occurred_at'),
+      admin.from('partner_campaigns').select('amount_paid, status, created_at'),
     ]);
 
   if (ordersRes.error) return NextResponse.json({ error: ordersRes.error.message }, { status: 500 });
@@ -109,7 +113,112 @@ export async function GET(req: NextRequest) {
 
   const gmvTotal = sum(paid, 'gross_value');
 
+  // ─── Central Financeira: consolidação de todas as fontes de receita ───
+  // Cada fonte é lida da sua tabela de origem. Nada é duplicado: a
+  // intermediação vem de `orders`, as assinaturas de `subscriptions`, os
+  // destaques de `featured_products` e as demais de `revenue_entries`.
+  const revenueEntries = (revenueRes.data ?? []) as any[];
+  const confirmedRevenue = revenueEntries.filter((r) => r.status === 'confirmed');
+  const partnerCampaigns = (campaignsRes.data ?? []) as any[];
+  const featuredRows = (featuredRes.data ?? []) as any[];
+
+  const inThisMonth = (iso: string | null) => !!iso && new Date(iso) >= startOfMonth;
+  const sumBy = (rows: any[], field: string, filter?: (r: any) => boolean) =>
+    rows.filter((r) => (filter ? filter(r) : true)).reduce((acc, r) => acc + Number(r[field] || 0), 0);
+  const fromEntries = (sources: string[], monthOnly = false) =>
+    sumBy(confirmedRevenue, 'net_value',
+      (r) => sources.includes(r.source) && (!monthOnly || inThisMonth(r.occurred_at)));
+
+  const featuredTotal = sumBy(featuredRows, 'price_paid');
+  const adsTotal = sumBy(partnerCampaigns, 'amount_paid') + fromEntries(['advertising', 'sponsored_campaign']);
+  const adsMonth = sumBy(partnerCampaigns, 'amount_paid', (c) => inThisMonth(c.created_at))
+    + fromEntries(['advertising', 'sponsored_campaign'], true);
+
+  const streams = [
+    {
+      id: 'marketplace_fee',
+      label: 'Intermediação de vendas',
+      description: 'Taxa da plataforma sobre pedidos pagos',
+      origin: 'orders.platform_fee',
+      total: sum(paid, 'platform_fee'),
+      month: sum(inMonth, 'platform_fee'),
+      active: paid.length > 0,
+    },
+    {
+      id: 'subscriptions',
+      label: 'Assinaturas Premium',
+      description: 'Receita recorrente mensal dos assinantes ativos',
+      origin: 'subscriptions + subscription_plans',
+      total: fromEntries(['club_membership']) + mrr,
+      month: mrr,
+      active: activeSubs.length > 0,
+    },
+    {
+      id: 'featured',
+      label: 'Destaque e impulsionamento',
+      description: 'Anúncios destacados pelos vendedores',
+      origin: 'featured_products.price_paid',
+      total: featuredTotal + fromEntries(['featured_listing']),
+      month: sumBy(featuredRows, 'price_paid', (f) => inThisMonth(f.created_at))
+        + fromEntries(['featured_listing'], true),
+      active: featuredRows.length > 0,
+    },
+    {
+      id: 'advertising',
+      label: 'Publicidade e campanhas patrocinadas',
+      description: 'Campanhas das empresas parceiras, inclusive geolocalizadas',
+      origin: 'partner_campaigns.amount_paid + revenue_entries',
+      total: adsTotal,
+      month: adsMonth,
+      active: partnerCampaigns.length > 0,
+    },
+    {
+      id: 'club',
+      label: 'Clube de Benefícios',
+      description: 'Planos de participação das empresas parceiras',
+      origin: 'revenue_entries.partner_plan',
+      total: fromEntries(['partner_plan']),
+      month: fromEntries(['partner_plan'], true),
+      active: confirmedRevenue.some((r) => r.source === 'partner_plan'),
+    },
+    {
+      id: 'ai_credits',
+      label: 'Recursos avançados de IA',
+      description: 'Créditos de geração de anúncios, vídeos e precificação',
+      origin: 'revenue_entries.ai_credits',
+      total: fromEntries(['ai_credits']),
+      month: fromEntries(['ai_credits'], true),
+      active: confirmedRevenue.some((r) => r.source === 'ai_credits'),
+    },
+    {
+      id: 'financial_services',
+      label: 'Serviços financeiros',
+      description: 'Receitas do ecossistema de pagamentos (arquitetura preparada)',
+      origin: 'revenue_entries.financial_services',
+      total: fromEntries(['financial_services']),
+      month: fromEntries(['financial_services'], true),
+      active: confirmedRevenue.some((r) => r.source === 'financial_services'),
+    },
+  ];
+
+  const totalRevenue = streams.reduce((acc, s) => acc + s.total, 0);
+  const monthRevenue = streams.reduce((acc, s) => acc + s.month, 0);
+
   return NextResponse.json({
+    finance: {
+      streams: streams.map((s) => ({
+        ...s,
+        share: totalRevenue > 0 ? Number(((s.total / totalRevenue) * 100).toFixed(1)) : 0,
+      })),
+      totalRevenue,
+      monthRevenue,
+      // Custo transacional repassado ao gateway — abatido da receita bruta.
+      gatewayCost: sum(paid, 'gateway_fee'),
+      netRevenue: totalRevenue - sum(paid, 'gateway_fee'),
+      pendingRevenue: sumBy(revenueEntries, 'net_value', (r) => r.status === 'pending'),
+      activeStreams: streams.filter((s) => s.active).length,
+      totalStreams: streams.length,
+    },
     revenue: {
       gmvMonth,
       gmvTotal,
