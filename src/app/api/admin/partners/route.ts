@@ -173,6 +173,46 @@ export async function POST(req: NextRequest) {
 
   const db = getServiceClient();
 
+  // Responsável opcional: quando informado, já sai do cadastro com acesso ao
+  // Portal do Parceiro. Sem isso, a empresa nasce sem ninguém que consiga
+  // entrar no portal — situação que a aba "Equipe" sinaliza depois.
+  let owner: { id: string; name: string | null; email: string } | null = null;
+  const ownerEmail = String(body.owner_email ?? '').trim().toLowerCase();
+
+  if (ownerEmail) {
+    const { data: found } = await db
+      .from('users').select('id, name, email').ilike('email', ownerEmail).maybeSingle();
+    if (!found) {
+      return NextResponse.json(
+        {
+          error: `Nenhuma conta encontrada para ${ownerEmail}. A pessoa precisa se cadastrar no COMPREOUVENDA antes de ser vinculada como responsável.`,
+          code: 'owner_not_found',
+        },
+        { status: 404 }
+      );
+    }
+
+    const { data: linked } = await db
+      .from('partner_members')
+      .select('partner:partners(trade_name)')
+      .eq('user_id', found.id)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (linked) {
+      const p = Array.isArray(linked.partner) ? linked.partner[0] : linked.partner;
+      return NextResponse.json(
+        {
+          error: `Esta conta já é responsável pela empresa "${p?.trade_name ?? 'outra empresa'}". Revogue o acesso anterior antes de vinculá-la aqui.`,
+          code: 'already_linked',
+        },
+        { status: 409 }
+      );
+    }
+
+    owner = found;
+  }
+
   const { data: dup } = await db.from('partners').select('id, trade_name').eq('tax_id', tax_id).maybeSingle();
   if (dup) {
     return NextResponse.json(
@@ -195,6 +235,7 @@ export async function POST(req: NextRequest) {
       instagram: body.instagram ?? null,
       plan: PLANS.includes(body.plan) ? body.plan : 'free',
       status: 'pending',
+      owner_id: owner?.id ?? null,
     })
     .select()
     .single();
@@ -203,9 +244,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Erro ao cadastrar parceiro: ${error.message}` }, { status: 500 });
   }
 
-  await audit(admin, 'partner_created', data.id, { trade_name, tax_id, by: admin.email });
+  // O vínculo em `partner_members` é o que efetivamente abre o portal;
+  // `owner_id` sozinho apenas registra quem responde pela empresa.
+  if (owner) {
+    await db.from('partner_members').insert({
+      partner_id: data.id,
+      user_id: owner.id,
+      role: 'owner',
+      is_active: true,
+    });
+  }
 
-  return NextResponse.json({ partner: data }, { status: 201 });
+  await audit(admin, 'partner_created', data.id, {
+    trade_name,
+    tax_id,
+    owner_email: owner?.email ?? null,
+    by: admin.email,
+  });
+
+  return NextResponse.json(
+    {
+      partner: data,
+      message: owner
+        ? `Parceiro cadastrado. ${owner.name || owner.email} já tem acesso ao Portal do Parceiro como responsável.`
+        : 'Parceiro cadastrado. Nenhuma conta tem acesso ao portal ainda — conceda o acesso na aba "Equipe".',
+    },
+    { status: 201 }
+  );
 }
 
 // ─── PATCH: aprovar / rejeitar / suspender / reativar / plano ───────────────
@@ -220,7 +285,7 @@ export async function PATCH(req: NextRequest) {
   const db = getServiceClient();
   const { data: current } = await db
     .from('partners')
-    .select('id, status, trade_name, plan')
+    .select('id, status, trade_name, plan, owner_id')
     .eq('id', id)
     .maybeSingle();
 
@@ -296,5 +361,37 @@ export async function PATCH(req: NextRequest) {
     by: admin.email,
   });
 
-  return NextResponse.json({ partner: data });
+  // Aprovar uma empresa sem ninguém vinculado a deixaria aprovada e
+  // inacessível. Quando há um responsável de registro, promovemos o vínculo
+  // automaticamente; quando não há, devolvemos o aviso para o administrador
+  // resolver na aba "Equipe".
+  let accessWarning: string | null = null;
+
+  if (body.action === 'approve' || body.action === 'reactivate') {
+    const { count } = await db
+      .from('partner_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('partner_id', id)
+      .eq('is_active', true);
+
+    if ((count ?? 0) === 0) {
+      if (current.owner_id) {
+        await db.from('partner_members').upsert(
+          { partner_id: id, user_id: current.owner_id, role: 'owner', is_active: true },
+          { onConflict: 'partner_id,user_id' }
+        );
+        await audit(admin, 'partner_access_granted', id, {
+          reason: 'vínculo do responsável criado automaticamente na aprovação',
+          user_id: current.owner_id,
+          role: 'owner',
+          by: admin.email,
+        });
+        accessWarning = 'O responsável de registro foi vinculado automaticamente e já pode acessar o Portal do Parceiro.';
+      } else {
+        accessWarning = 'Atenção: nenhuma conta tem acesso ao Portal do Parceiro desta empresa. Conceda o acesso na aba "Equipe".';
+      }
+    }
+  }
+
+  return NextResponse.json({ partner: data, accessWarning });
 }

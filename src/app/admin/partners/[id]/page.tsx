@@ -9,6 +9,7 @@ import {
   Building2, Star, TrendingUp, ShieldCheck,
 } from 'lucide-react';
 import { adminFetchJson } from '@/lib/admin-fetch';
+import TeamTab from './TeamTab';
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
   pending: { label: 'Em análise', color: 'bg-amber-500/10 text-amber-500' },
@@ -380,32 +381,7 @@ export default function PartnerDetailPage() {
       )}
 
       {/* Equipe */}
-      {tab === 'team' && (
-        <div className="bg-gray-800 rounded-2xl border border-gray-700 divide-y divide-gray-700/50">
-          {members.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-14">
-              Nenhum membro com acesso ao Portal do Parceiro.
-            </p>
-          ) : members.map((m: any) => (
-            <div key={m.id} className="px-5 py-4 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm text-white font-medium">{m.user?.name ?? 'Usuário removido'}</p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {m.user?.email} · {m.unit_name ?? 'Todas as unidades'}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-[10px] bg-gray-700 text-gray-400 font-bold px-2 py-0.5 rounded-full">
-                  {m.role === 'owner' ? 'Responsável' : m.role === 'manager' ? 'Gerente' : 'Operador'}
-                </span>
-                {!m.is_active && (
-                  <span className="text-[10px] bg-red-500/10 text-red-400 font-bold px-2 py-0.5 rounded-full">inativo</span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {tab === 'team' && <TeamTab partnerId={id} />}
 
       {/* IA */}
       {tab === 'ai' && (
