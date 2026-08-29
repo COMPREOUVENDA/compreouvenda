@@ -1,8 +1,14 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { getServiceClient, requireAdmin } from '@/lib/api-auth'
 
-export async function GET() {
-  const supabase = createClient()
+export const dynamic = 'force-dynamic'
+
+export async function GET(req: NextRequest) {
+  // Esta rota expõe faturamento e volume de usuários — exige privilégio admin.
+  const auth = await requireAdmin(req)
+  if (auth instanceof NextResponse) return auth
+
+  const supabase = getServiceClient()
 
   const [users, products, orders] = await Promise.all([
     supabase.from('users').select('id, created_at', { count: 'exact' }),
