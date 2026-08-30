@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Sparkles, TrendingUp, BarChart2, Clock, CheckCircle, XCircle,
+  Sparkles, TrendingUp, BarChart2, Clock,
   Flame, Snowflake, Package, Filter,
 } from 'lucide-react';
+import { adminFetch } from '@/lib/admin-fetch';
 
 // ============================================================
 // TYPES
@@ -53,12 +54,6 @@ interface MarketAnalytic {
 // ============================================================
 // HELPERS
 // ============================================================
-
-const CATEGORY_NAMES: Record<string, string> = {
-  '1': 'Eletrônicos', '2': 'Móveis', '3': 'Veículos', '4': 'Roupas',
-  '5': 'Esportes', '6': 'Casa', '7': 'Brinquedos', '8': 'Livros',
-  '9': 'Games', '10': 'Beleza', '11': 'Ferramentas', '12': 'Outros',
-};
 
 function formatBRL(v: number) {
   return v?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? 'R$ 0';
@@ -110,42 +105,37 @@ export default function AdminAIPricingPage() {
   const [logs, setLogs] = useState<PricingLog[]>([]);
   const [suggestions, setSuggestions] = useState<PriceSuggestion[]>([]);
   const [analytics, setAnalytics] = useState<MarketAnalytic[]>([]);
+  const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'logs' | 'market'>('logs');
   const [filterCategory, setFilterCategory] = useState('');
 
-  // Simulated fetch from Supabase via anon key
+  // Os dados vêm de /api/admin/ai-pricing, protegida por requireAdmin — e não
+  // mais de chamadas diretas ao Supabase REST com a chave anônima.
   useEffect(() => {
+    let ativo = true;
     async function load() {
       setLoading(true);
       try {
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-        if (!supabaseUrl || !anonKey) return;
-
-        const headers = {
-          apikey: anonKey,
-          Authorization: `Bearer ${anonKey}`,
-          'Content-Type': 'application/json',
-        };
-
-        const [logsRes, suggestionsRes, analyticsRes] = await Promise.all([
-          fetch(`${supabaseUrl}/rest/v1/ai_pricing_logs?order=created_at.desc&limit=50`, { headers }),
-          fetch(`${supabaseUrl}/rest/v1/price_suggestions?order=created_at.desc&limit=100`, { headers }),
-          fetch(`${supabaseUrl}/rest/v1/market_analytics?order=category.asc`, { headers }),
-        ]);
-
-        if (logsRes.ok) setLogs(await logsRes.json());
-        if (suggestionsRes.ok) setSuggestions(await suggestionsRes.json());
-        if (analyticsRes.ok) setAnalytics(await analyticsRes.json());
-      } catch (e) {
-        console.error('Admin AI load error:', e);
+        const res = await adminFetch('/api/admin/ai-pricing');
+        const json = await res.json();
+        if (!ativo || json.error) return;
+        setLogs(json.logs ?? []);
+        setSuggestions(json.suggestions ?? []);
+        setAnalytics(json.analytics ?? []);
+        setCategoryNames(json.category_names ?? {});
+        setCategories(json.categories ?? []);
+      } catch {
+        // A tela segue utilizável com as listas vazias.
       } finally {
-        setLoading(false);
+        if (ativo) setLoading(false);
       }
     }
     load();
+    return () => {
+      ativo = false;
+    };
   }, []);
 
   // Metrics
@@ -315,8 +305,8 @@ export default function AdminAIPricingPage() {
               className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-purple"
             >
               <option value="">Todas as categorias</option>
-              {Object.entries(CATEGORY_NAMES).map(([id, name]) => (
-                <option key={id} value={id}>{name}</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           </div>
@@ -328,7 +318,7 @@ export default function AdminAIPricingPage() {
                   <div className="flex items-center gap-2">
                     <Package className="w-4 h-4 text-brand-purple" />
                     <span className="text-sm font-bold text-white">
-                      {CATEGORY_NAMES[a.category] || `Cat. ${a.category}`}
+                      {categoryNames[a.category] || a.category}
                     </span>
                   </div>
                   <DemandBadge level={a.demand_score >= 80 ? 'very_high' : a.demand_score >= 65 ? 'high' : a.demand_score >= 45 ? 'medium' : 'low'} />

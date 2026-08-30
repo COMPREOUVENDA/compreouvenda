@@ -9,6 +9,7 @@ import { ProductCardSkeleton } from '@/components/product/ProductCardSkeleton';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import HeroCTA from '@/components/home/HeroCTA';
+import ClubHighlight from '@/components/home/ClubHighlight';
 import FilterDrawer, { DEFAULT_FEED_FILTERS } from '@/components/feed/FilterDrawer';
 import { track } from '@/lib/analytics';
 import type { FeedFilters } from '@/components/feed/FilterDrawer';
@@ -160,6 +161,9 @@ export default function HomePage() {
           </Link>
         </div>
       </div>
+
+      {/* Clube de Benefícios — some da home quando não há parceiro ativo */}
+      <ClubHighlight />
 
       {/* Categories */}
       <div className="px-4 py-3">

@@ -7,7 +7,7 @@ import Link from 'next/link';
 import {
   Settings, Star, Package, ShoppingBag, Heart, MapPin,
   CheckCircle, Share2, Edit3, Loader2, TrendingUp,
-  MessageCircle, UserCheck, Shield,
+  MessageCircle, UserCheck, Shield, Ticket,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
@@ -256,6 +256,14 @@ export default function ProfilePage() {
             <MessageCircle className="w-4 h-4" /> Chat
           </Link>
         </div>
+
+        {/* Clube de Benefícios */}
+        <Link
+          href="/clube/meus-codigos"
+          className="mt-2 flex items-center justify-center gap-2 rounded-2xl border-2 border-brand-purple/20 py-2.5 text-sm font-semibold text-brand-purple transition-colors hover:bg-brand-purple/5"
+        >
+          <Ticket className="w-4 h-4" /> Meus códigos do Clube
+        </Link>
 
         {/* Ver perfil público */}
         <Link

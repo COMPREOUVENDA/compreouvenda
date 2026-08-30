@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient, requirePartner } from '@/lib/api-auth';
+import { evaluateAvailability } from '@/lib/club';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,8 +19,6 @@ export const dynamic = 'force-dynamic';
  * `trg_bump_benefit_usage` — a rota não soma nada manualmente, para não
  * haver duas fontes de verdade sobre o consumo.
  */
-
-const DAY_NAMES = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 
 export async function GET(req: NextRequest) {
   const p = await requirePartner(req, 'operator', false);
@@ -123,36 +122,17 @@ export async function POST(req: NextRequest) {
       { status: 409 }
     );
   }
-  if (benefit.starts_at && new Date(benefit.starts_at) > now) {
-    return NextResponse.json({ error: 'O benefício ainda não começou', code: 'not_started' }, { status: 409 });
-  }
-  if (benefit.ends_at && new Date(benefit.ends_at) < now) {
-    return NextResponse.json({ error: 'O benefício já encerrou', code: 'benefit_ended' }, { status: 409 });
-  }
-  if (benefit.total_quantity != null && benefit.used_quantity >= benefit.total_quantity) {
-    return NextResponse.json({ error: 'O benefício esgotou', code: 'sold_out' }, { status: 409 });
-  }
 
-  // Restrições de dia da semana e horário.
-  if (Array.isArray(benefit.valid_weekdays) && benefit.valid_weekdays.length > 0
-    && !benefit.valid_weekdays.includes(now.getDay())) {
-    const dias = benefit.valid_weekdays.map((d: number) => DAY_NAMES[d]).join(', ');
+  // Vigência, estoque e janela de dia/hora seguem a MESMA regra da vitrine do
+  // aplicativo (src/lib/club.ts) — inclusive o fuso de Brasília. Avaliar isso
+  // no fuso do servidor recusaria, em produção (UTC), um cliente que está na
+  // loja dentro do horário anunciado.
+  const disponibilidade = evaluateAvailability(benefit, now);
+  if (!disponibilidade.available) {
     return NextResponse.json(
-      { error: `Este benefício é válido apenas em: ${dias}`, code: 'invalid_weekday' },
+      { error: disponibilidade.reason, code: disponibilidade.code },
       { status: 409 }
     );
-  }
-  if (benefit.valid_hour_start && benefit.valid_hour_end) {
-    const hhmm = now.toTimeString().slice(0, 8);
-    if (hhmm < benefit.valid_hour_start || hhmm > benefit.valid_hour_end) {
-      return NextResponse.json(
-        {
-          error: `Este benefício é válido das ${benefit.valid_hour_start.slice(0, 5)} às ${benefit.valid_hour_end.slice(0, 5)}`,
-          code: 'invalid_hour',
-        },
-        { status: 409 }
-      );
-    }
   }
 
   const purchaseValue = body.purchase_value != null ? Number(body.purchase_value) : null;

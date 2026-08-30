@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MapPin, Loader2, WifiOff, User } from 'lucide-react';
+import { MapPin, Loader2, WifiOff, User, Ticket } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAuthStore } from '@/stores/authStore';
@@ -58,6 +58,14 @@ export default function Header() {
               {granted ? locationLabel : 'Sua localização'}
             </span>
           </button>
+          <Link
+            href="/clube"
+            aria-label="Clube de Benefícios"
+            className="hidden sm:flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-brand-purple transition-colors bg-gray-100/80 px-3 py-1.5 rounded-full"
+          >
+            <Ticket className="w-3.5 h-3.5" />
+            <span>Clube</span>
+          </Link>
           <NotificationCenter />
           {user && (
             <Link

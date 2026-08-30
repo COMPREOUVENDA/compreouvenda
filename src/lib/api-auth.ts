@@ -29,7 +29,8 @@ export async function getAuthUserId(request: NextRequest): Promise<string | null
   try {
     const anon = createClient(
       cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL),
-      cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+      cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+      { global: { fetch: noStoreFetch } }
     );
     const { data } = await anon.auth.getUser(bearer);
     return data.user?.id ?? null;
@@ -38,12 +39,28 @@ export async function getAuthUserId(request: NextRequest): Promise<string | null
   }
 }
 
+/**
+ * `fetch` sem cache para o supabase-js.
+ *
+ * O Next 14 guarda em Data Cache as respostas de `fetch` feitas no servidor — e
+ * o supabase-js consulta o banco justamente por `fetch`. Na prática isso fez a
+ * vitrine do clube continuar exibindo benefícios que já tinham sido removidos
+ * do banco, e serviria resposta de uma sessão para outra em rotas de auth.
+ * Leitura de banco nunca pode vir de cache: cada requisição consulta o estado
+ * atual.
+ */
+const noStoreFetch: typeof fetch = (input, init) =>
+  fetch(input, { ...init, cache: 'no-store' });
+
 /** Cliente com service role — bypassa RLS. Use apenas em rotas server-side. */
 export function getServiceClient() {
   return createClient(
     cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL),
     cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY),
-    { auth: { autoRefreshToken: false, persistSession: false } }
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { fetch: noStoreFetch },
+    }
   );
 }
 
